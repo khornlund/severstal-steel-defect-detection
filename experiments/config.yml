@@ -1,0 +1,58 @@
+short_name: sever
+n_gpu: 1
+save_dir: saved/
+seed: 1234
+apex: 'O1'
+
+arch:
+  type: Unet
+  args:
+    encoder_name: efficientnet-b4
+    encoder_weights: imagenet
+    classes: 4
+    activation: null
+
+augmentation:
+  type: NormalizeTransforms
+  args:
+    train: true
+
+data_loader:
+  type: SteelDataLoader
+  args:
+    batch_size: 4
+    data_dir: data/raw/severstal-steel-defect-detection
+    nworkers: 4
+    shuffle: true
+    validation_split: 0.2
+
+loss: bce_loss
+
+lr_scheduler:
+  type: StepLR
+  args:
+    gamma: 0.1
+    step_size: 5
+
+metrics:
+- dummy
+
+optimizer:
+  type: RAdam
+  args:
+    lr: 0.001
+    weight_decay: 0.0005
+
+training:
+  early_stop: 20
+  epochs: 30
+  monitor: min val_loss
+  save_period: 1
+  tensorboard: true
+  verbose: 2
+
+testing:
+  data_dir: data/
+  batch_size: 128
+  nworkers: 8
+  verbose: 2

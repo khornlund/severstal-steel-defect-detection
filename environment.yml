@@ -1,0 +1,30 @@
+name: sever
+
+channels:
+  - pytorch
+  - conda-forge
+
+dependencies:
+  - python=3.6
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - pytest
+  - flake8
+  - rope
+  - click
+  - jupyter
+  - pyyaml
+  - pytorch>=1.1.0
+  - torchvision
+  - cudatoolkit=10.0
+  - tensorflow
+  - tensorboard>=1.14
+  - future
+  - tqdm
+  - pip
+  - pip:
+    # apex
+    # segmentation-models-pytorch
+    - -e .  # install package in development mode
