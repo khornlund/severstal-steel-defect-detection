@@ -7,24 +7,46 @@ from .process import make_mask
 from .augmentation import get_transforms
 
 
-class SteelDataset(Dataset):
+# TODO: using cv2 means mean/std for imagenet will be different
 
-    def __init__(self, df, data_folder, train):
+class SteelDatasetTrainVal(Dataset):
+
+    def __init__(self, df, data_dir, train):
         self.df = df
-        self.root = data_folder
+        self.data_dir = data_dir / 'train_images'
         self.train = train
         self.transforms = get_transforms(train)
         self.fnames = self.df.index.tolist()
 
     def __getitem__(self, idx):
         image_id, mask = make_mask(idx, self.df)
-        image_path = os.path.join(self.root, "train_images", image_id)
+        image_path = str(self.data_dir / image_id)
         img = cv2.imread(image_path)
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']
         mask = augmented['mask']  # 1x256x1600x4
         mask = mask[0].permute(2, 0, 1)  # 1x4x256x1600
         return img, mask
+
+    def __len__(self):
+        return len(self.fnames)
+
+
+class SteelDatasetTest(Dataset):
+
+    def __init__(self, df, data_dir, train):
+        self.df = df
+        self.data_dir = data_dir / 'test_images'
+        self.train = train
+        self.transforms = get_transforms(train)
+        self.fnames = self.df.index.tolist()
+
+    def __getitem__(self, idx):
+        fname = self.fnames[idx]
+        path = str(self.data_dir / fname)
+        image = cv2.imread(path)
+        images = self.transform(image=image)["image"]
+        return fname, images
 
     def __len__(self):
         return len(self.fnames)

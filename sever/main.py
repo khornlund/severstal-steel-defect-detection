@@ -8,13 +8,13 @@ import pandas as pd
 import torch
 import segmentation_models_pytorch as module_arch
 
-import sever.data_loader.augmentation as module_aug
 import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
 from sever.trainer import Trainer
 from sever.utils import setup_logger, setup_logging
+from sever.data_loader import post_process, mask2rle
 
 
 def get_instance(module, name, config, *args):
@@ -86,38 +86,38 @@ class Runner:
 
         self.logger.debug('Building model architecture')
         model = get_instance(module_arch, 'arch', config)
+        model, device = self._prepare_device(model, config['n_gpu'])
+
+        opt_level = config['apex']
+        model = amp.initialize(model, opt_level=opt_level)
 
         self.logger.debug(f'Loading checkpoint {model_checkpoint}')
         checkpoint = torch.load(model_checkpoint)
-        state_dict = checkpoint['state_dict']
-        if config['n_gpu'] > 1:
-            model = torch.nn.DataParallel(model)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(checkpoint['state_dict'])
+        amp.load_state_dict(checkpoint['amp'])
 
-        # prepare model for testing
-        model, device = self._prepare_device(model, config['n_gpu'])
         model.eval()
+        predictions = []
 
         preds = torch.zeros(len(data_loader.dataset))
         self.logger.debug('Starting...')
         with torch.no_grad():
-            for i, data in enumerate(tqdm(data_loader)):
+            for i, (fs, data) in enumerate(tqdm(data_loader)):
                 data = data.to(device)
-                output = model(data).cpu()
-                batch_size = output.shape[0]
-                preds[i * batch_size:(i + 1) * batch_size] = output
+                output = model(data)
+                batch_preds = torch.sigmoid(output).detach().cpu().numpy()
+                for (f, preds) in zip(fs, batch_preds):
+                    for class_, pred in enumerate(preds):
+                        pred, num = post_process(pred)
+                        rle = mask2rle(pred)
+                        name = f + f"_{class_+1}"
+                        predictions.append([name, rle])
 
-        # wrangle and save predictions
-
-        raw_df = pd.DataFrame(preds.numpy())
-
-        # do something with predictions
-
-        predictions_filename = os.path.join(
-            config['testing']['data_dir'],
-            config['name'] + '_preds.csv')
-        raw_df.to_csv(predictions_filename)
-        self.logger.info(f'Finished saving predictions to "{predictions_filename}"')
+        # save predictions to submission.csv
+        df = pd.DataFrame(predictions, columns=['ImageId_ClassId', 'EncodedPixels'])
+        self.logger.info(df.head(20))
+        df.to_csv("submission.csv", index=False)
+        self.logger.info(f'Finished saving predictions to "submission.csv"')
 
     def _prepare_device(self, model, n_gpu_use):
         device, device_ids = self._get_device(n_gpu_use)

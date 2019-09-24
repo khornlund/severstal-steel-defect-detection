@@ -123,7 +123,7 @@ class Trainer(BaseTrainer):
                 total_val_metrics += self._eval_metrics(output, target)
 
         total_val_loss /= len(self.valid_data_loader)
-        self.writer.set_step((epoch - 1) * len(self.valid_data_loader), 'valid')
+        self.writer.set_step((epoch - 1), 'valid')
         self.writer.add_scalar('loss', total_val_loss)
 
         return {

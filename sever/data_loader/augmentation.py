@@ -1,6 +1,6 @@
 import abc
 
-from albumentations import (HorizontalFlip, Normalize, Compose)
+from albumentations import HorizontalFlip, Normalize, Compose
 from albumentations.torch import ToTensor
 import torchvision.transforms as T
 

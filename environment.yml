@@ -23,6 +23,7 @@ dependencies:
   - tensorboard>=1.14
   - future
   - tqdm
+  - kaggle
   - pip
   - pip:
     # apex

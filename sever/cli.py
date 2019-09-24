@@ -5,11 +5,20 @@ import yaml
 import torch
 
 from sever.main import Runner
+from sever.utils import kaggle_upload
 
 
 @click.group()
 def cli():
     """CLI for sever"""
+
+
+@cli.command()
+@click.option('-r', '--run-directory', required=True, type=str, help='Path to run')
+@click.option('-e', '--epochs', type=int, multiple=True, help='Epochs to upload')
+def upload(run_directory, epochs):
+    """Upload model weights as a dataset to kaggle"""
+    kaggle_upload(run_directory, epochs)
 
 
 @cli.command()

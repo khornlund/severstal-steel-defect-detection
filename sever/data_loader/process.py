@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 
 # https://www.kaggle.com/paulorzp/rle-functions-run-lenght-encode-decode
@@ -31,3 +32,18 @@ def make_mask(row_id, df):
                 mask[pos:(pos + le)] = 1
             masks[:, :, idx] = mask.reshape(256, 1600, order='F')
     return fname, masks
+
+
+def post_process(probability, threshold=0.5, min_size=3500):
+    '''Post processing of each predicted mask, components with lesser number of pixels
+    than `min_size` are ignored'''
+    mask = cv2.threshold(probability, threshold, 1, cv2.THRESH_BINARY)[1]
+    num_component, component = cv2.connectedComponents(mask.astype(np.uint8))
+    predictions = np.zeros((256, 1600), np.float32)
+    num = 0
+    for c in range(1, num_component):
+        p = (component == c)
+        if p.sum() > min_size:
+            predictions[p] = 1
+            num += 1
+    return predictions, num
