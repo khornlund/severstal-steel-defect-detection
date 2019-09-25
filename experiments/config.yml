@@ -7,7 +7,7 @@ apex: 'O1'
 arch:
   type: Unet
   args:
-    encoder_name: efficientnet-b4
+    encoder_name: efficientnet-b2
     encoder_weights: imagenet
     classes: 4
     activation: null
@@ -20,31 +20,35 @@ augmentation:
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 4
+    batch_size: 8
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
     validation_split: 0.2
 
-loss: bce_loss
+loss: CombinedLoss
 
 lr_scheduler:
-  type: StepLR
+  type: MultiStepLR
   args:
-    gamma: 0.5
-    step_size: 1
+    gamma: 0.1
+    milestones: [2, 10, 20]
 
 metrics:
-- dummy
+  - dice_0
+  - dice_1
+  - dice_2
+  - dice_3
+  - dice_mean
 
 optimizer:
   type: RAdam
   args:
-    lr: 0.001
+    lr: 0.0005
     weight_decay: 0.0005
 
 training:
-  early_stop: 20
+  early_stop: 5
   epochs: 30
   monitor: min val_loss
   save_period: 1
