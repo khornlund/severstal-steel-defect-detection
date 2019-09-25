@@ -34,7 +34,7 @@ class SteelDataLoader(DataLoader):
         df = df.pivot(index='ImageId', columns='ClassId', values='EncodedPixels')
         df['defects'] = df.count(axis=1)
 
-        if train:
+        if train and validation_split > 0:
             # df = df.loc[df.defects > 0, :]  # only train on images with defects
             return train_test_split(df, test_size=validation_split, stratify=df["defects"])
 

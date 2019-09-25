@@ -4,8 +4,8 @@ from albumentations import HorizontalFlip, Normalize, Compose
 from albumentations.torch import ToTensor
 import torchvision.transforms as T
 
-MEAN = [0.485, 0.456, 0.406],
-STD = [0.229, 0.224, 0.225],
+MEAN = [0.3439]
+STD = [0.0383]
 
 
 def get_transforms(train):

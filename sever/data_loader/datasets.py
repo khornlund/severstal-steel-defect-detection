@@ -19,7 +19,7 @@ class SteelDatasetTrainVal(Dataset):
     def __getitem__(self, idx):
         image_id, mask = make_mask(idx, self.df)
         image_path = str(self.data_dir / image_id)
-        img = cv2.imread(image_path)
+        img = cv2.imread(image_path)[:, :, 0:1]  # select one channel
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']
         mask = augmented['mask']  # 1x256x1600x4
@@ -41,7 +41,7 @@ class SteelDatasetTest(Dataset):
     def __getitem__(self, idx):
         fname = self.fnames[idx]
         path = str(self.data_dir / fname)
-        image = cv2.imread(path)
+        image = cv2.imread(path)[:, :, 0:1]  # select one channel
         images = self.transform(image=image)["image"]
         return fname, images
 
