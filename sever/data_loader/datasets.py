@@ -1,5 +1,3 @@
-import os
-
 import cv2
 from torch.utils.data import Dataset
 
@@ -34,11 +32,10 @@ class SteelDatasetTrainVal(Dataset):
 
 class SteelDatasetTest(Dataset):
 
-    def __init__(self, df, data_dir, train):
+    def __init__(self, df, data_dir):
         self.df = df
         self.data_dir = data_dir / 'test_images'
-        self.train = train
-        self.transforms = get_transforms(train)
+        self.transforms = get_transforms(False)
         self.fnames = self.df.index.tolist()
 
     def __getitem__(self, idx):

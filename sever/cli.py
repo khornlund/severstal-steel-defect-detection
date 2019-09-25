@@ -22,7 +22,7 @@ def upload(run_directory, epochs):
 
 
 @cli.command()
-@click.option('-c', '--config-filename', default='experiments/config.yml', type=str,
+@click.option('-c', '--config-filename', type=str, multiple=True,
               help='config file path (default: None)')
 @click.option('-r', '--resume', default=None, type=str,
               help='path to latest checkpoint (default: None)')
@@ -30,13 +30,12 @@ def upload(run_directory, epochs):
               help='indices of GPUs to enable (default: all)')
 def train(config_filename, resume, device):
     if config_filename:
-        config = load_config(config_filename)
+        configs = [load_config(f) for f in config_filename]
     elif resume:
         # load config from checkpoint if new config file is not given.
         # Use '--config' and '--resume' together to fine-tune trained model with
         # changed configurations.
-        config = torch.load(resume)['config']
-
+        configs = [torch.load(resume)['config']]
     else:
         raise AssertionError('Configuration file need to be specified. '
                              'Add "-c experiments/config.yaml", for example.')
@@ -44,7 +43,8 @@ def train(config_filename, resume, device):
     if device:
         os.environ['CUDA_VISIBLE_DEVICES'] = device
 
-    Runner().train(config, resume)
+    for config in configs:
+        Runner().train(config, resume)
 
 
 @cli.command()

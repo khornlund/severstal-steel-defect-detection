@@ -35,7 +35,7 @@ class SteelDataLoader(DataLoader):
         df['defects'] = df.count(axis=1)
 
         if train:
-            df = df.loc[df.defects > 0, :]  # only train on images with defects
+            # df = df.loc[df.defects > 0, :]  # only train on images with defects
             return train_test_split(df, test_size=validation_split, stratify=df["defects"])
 
         return df, pd.DataFrame({})
