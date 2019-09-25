@@ -6,21 +6,20 @@ PyTorch deep learning project made easy.
 .. contents:: Table of Contents
    :depth: 2
 
+Submission Log
+==============
+
++-------+-------+-----------+------+-----------+--------+---------------------+
+| Score | Model | Optimizer |  LR  | Scheduler | Epochs |        Notes        |
++=======+=======+===========+======+===========+========+=====================+
+| 87975 |  B4   |   RAdam   | 1e-3 |    Step   |    2   | First sub.          |
++-------+-------+-----------+------+-----------+--------+---------------------+
+
 Requirements
 ============
 * Python >= 3.6
 * PyTorch >= 1.1
 * Tensorboard >= 1.4
-
-Features
-========
-* Clear folder structure which is suitable for many deep learning projects.
-* `.yml` config file support for more convenient parameter tuning.
-* Checkpoint saving and resuming.
-* Abstract base classes for faster development:
-  * `BaseTrainer` handles checkpoint saving/resuming, training process logging, and more.
-  * `BaseDataLoader` handles batch generation, data shuffling, and validation data splitting.
-  * `BaseModel` provides basic model summary.
 
 Folder Structure
 ================
