@@ -99,19 +99,25 @@ class Runner:
         model.eval()
         predictions = []
 
-        preds = torch.zeros(len(data_loader.dataset))
+        bs = data_loader.batch_size
+        preds = torch.zeros(len(data_loader) * bs, 4, 256, 1600)  # N may be too large
+        ids = []
         self.logger.debug('Starting...')
         with torch.no_grad():
-            for i, (fs, data) in enumerate(tqdm(data_loader)):
+            for bidx, (batch_ids, data) in enumerate(tqdm(data_loader)):
+                ids.extend(batch_ids)
                 data = data.to(device)
                 output = model(data)
+                output_size = output.size()
                 batch_preds = torch.sigmoid(output).detach().cpu().numpy()
-                for (f, preds) in zip(fs, batch_preds):
-                    for class_, pred in enumerate(preds):
-                        pred, num = post_process(pred)
-                        rle = mask2rle(pred)
-                        name = f + f"_{class_+1}"
-                        predictions.append([name, rle])
+                preds[bidx * bs:(bidx + 1) * output_size[0], :, :, :] = batch_preds
+
+        for (f, p) in zip(ids, preds):
+            for class_, pred in enumerate(p):
+                pred, num = post_process(pred)
+                rle = mask2rle(pred)
+                name = f + f"_{class_+1}"
+                predictions.append([name, rle])
 
         # save predictions to submission.csv
         df = pd.DataFrame(predictions, columns=['ImageId_ClassId', 'EncodedPixels'])

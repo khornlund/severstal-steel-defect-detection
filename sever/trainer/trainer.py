@@ -14,7 +14,7 @@ class Trainer(BaseTrainer):
         Inherited from BaseTrainer.
     """
     def __init__(self, model, loss, metrics, optimizer, resume, config, device,
-                 data_loader, valid_data_loader=None, lr_scheduler=None):
+                 data_loader, valid_data_loader=None, lr_scheduler=None, unfreeze_encoder=None):
         super().__init__(model, loss, metrics, optimizer, resume, config, device)
         self.config = config
         self.data_loader = data_loader
@@ -23,12 +23,21 @@ class Trainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
-    def _eval_metrics(self, output, target):
+        if unfreeze_encoder is not None:
+            self.logger.info(f'Freezing encoder weights until epoch {unfreeze_encoder}')
+            for param in model.encoder.parameters():
+                param.requires_grad = False
+            self.unfreeze_encoder = unfreeze_encoder
+        else:
+            self.unfreeze_encoder = np.inf
+
+    def _eval_metrics(self, output, target, log=True):
         with torch.no_grad():
             acc_metrics = np.zeros(len(self.metrics))
             for i, metric in enumerate(self.metrics):
                 acc_metrics[i] += metric(output, target)
-                self.writer.add_scalar(f'{metric.__name__}', acc_metrics[i])
+                if log:
+                    self.writer.add_scalar(f'{metric.__name__}', acc_metrics[i])
             return acc_metrics
 
     def _train_epoch(self, epoch):
@@ -48,6 +57,11 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
+        if epoch > self.unfreeze_encoder:
+            self.logger.info('Unfreezing encoder weights')
+            for param in self.model.encoder.parameters():
+                param.requires_grad = True
+            self.unfreeze_encoder = np.inf
 
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         self.writer.add_scalar('LR', self._get_lr())
@@ -121,13 +135,16 @@ class Trainer(BaseTrainer):
                 output = self.model(data)
                 loss = self.loss(output, target)
                 total_val_loss += loss.item()
-                total_val_metrics += self._eval_metrics(output, target)
+                total_val_metrics += self._eval_metrics(output, target, log=False)
 
         total_val_loss /= len(self.valid_data_loader)
+        total_val_metrics /= len(self.valid_data_loader)
         self.writer.set_step((epoch - 1), 'valid')
         self.writer.add_scalar('loss', total_val_loss)
+        for i, metric in enumerate(self.metrics):
+            self.writer.add_scalar(f'{metric.__name__}', total_val_metrics[i])
 
         return {
             'val_loss': total_val_loss,
-            'val_metrics': (total_val_metrics / len(self.valid_data_loader)).tolist()
+            'val_metrics': total_val_metrics.tolist()
         }

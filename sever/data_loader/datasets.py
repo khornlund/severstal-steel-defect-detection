@@ -5,7 +5,9 @@ from .process import make_mask
 from .augmentation import get_transforms
 
 
-# TODO: using cv2 means mean/std for imagenet will be different
+def read_greyscale(f):
+    return cv2.imread(str(f))[:, :, 0:1]  # select one channel
+
 
 class SteelDatasetTrainVal(Dataset):
 
@@ -18,8 +20,8 @@ class SteelDatasetTrainVal(Dataset):
 
     def __getitem__(self, idx):
         image_id, mask = make_mask(idx, self.df)
-        image_path = str(self.data_dir / image_id)
-        img = cv2.imread(image_path)[:, :, 0:1]  # select one channel
+        image_path = self.data_dir / image_id
+        img = read_greyscale(image_path)
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']
         mask = augmented['mask']  # 1x256x1600x4
@@ -41,7 +43,7 @@ class SteelDatasetTest(Dataset):
     def __getitem__(self, idx):
         fname = self.fnames[idx]
         path = str(self.data_dir / fname)
-        image = cv2.imread(path)[:, :, 0:1]  # select one channel
+        image = read_greyscale(path)
         images = self.transform(image=image)["image"]
         return fname, images
 

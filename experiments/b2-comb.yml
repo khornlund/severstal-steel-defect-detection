@@ -33,7 +33,7 @@ lr_scheduler:
   type: MultiStepLR
   args:
     gamma: 0.1
-    milestones: [5, 12, 20]
+    milestones: [2, 10, 20]
 
 metrics:
   - dice_0
@@ -45,11 +45,10 @@ metrics:
 optimizer:
   type: RAdam
   args:
-    lr: 0.001
+    lr: 0.0005
     weight_decay: 0.0005
 
 training:
-  unfreeze_encoder: 2
   early_stop: 5
   epochs: 30
   monitor: min val_loss
