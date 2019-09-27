@@ -12,9 +12,10 @@ import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
+import sever.data_loader.augmentation as module_aug
 from sever.trainer import Trainer
 from sever.utils import setup_logger, setup_logging
-from sever.data_loader import post_process, mask2rle
+from sever.data_loader import PostProcessor, mask2rle
 
 
 def get_instance(module, name, config, *args):
@@ -28,16 +29,20 @@ class Runner:
         self.logger = setup_logger(self, config['training']['verbose'])
         self._seed_everything(config['seed'])
 
-        # self.logger.debug('Getting augmentations')
-        # transforms = get_instance(module_aug, 'augmentation', config)
+        self.logger.debug('Getting augmentations')
+        transforms = getattr(module_aug, config['augmentation'])()
 
         self.logger.debug('Getting data_loader instance')
-        data_loader = get_instance(module_data, 'data_loader', config)
+        data_loader = get_instance(module_data, 'data_loader', config, transforms)
         valid_data_loader = data_loader.split_validation()
 
         self.logger.debug('Building model architecture')
         model = get_instance(module_arch, 'arch', config)
         model, device = self._prepare_device(model, config['n_gpu'])
+
+        self.logger.debug('Freezing encoder weights')
+        for p in model.encoder.parameters():
+            p.requires_grad = False
 
         self.logger.debug('Getting loss and metric function handles')
         loss = getattr(module_loss, config['loss'])()
@@ -96,6 +101,8 @@ class Runner:
         model.load_state_dict(checkpoint['state_dict'])
         amp.load_state_dict(checkpoint['amp'])
 
+        pp = PostProcessor()
+
         model.eval()
         predictions = []
 
@@ -114,7 +121,7 @@ class Runner:
 
         for (f, p) in zip(ids, preds):
             for class_, pred in enumerate(p):
-                pred, num = post_process(pred)
+                pred, num = pp.process(class_, pred)
                 rle = mask2rle(pred)
                 name = f + f"_{class_+1}"
                 predictions.append([name, rle])

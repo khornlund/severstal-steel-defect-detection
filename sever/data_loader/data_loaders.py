@@ -12,7 +12,10 @@ class SteelDataLoader(DataLoader):
     train_csv = 'train.csv'
     test_csv  = 'sample_submission.csv'
 
-    def __init__(self, data_dir, batch_size, shuffle, validation_split, nworkers, train=True):
+    def __init__(self, transforms, data_dir, batch_size, shuffle, validation_split, nworkers,
+                 train=True
+    ):  # noqa
+        self.transforms = transforms
         self.data_dir = Path(data_dir)
         self.batch_size = batch_size
         self.nworkers = nworkers
@@ -20,9 +23,9 @@ class SteelDataLoader(DataLoader):
         self.train_df, self.val_df = self.load_df(train, validation_split)
 
         if train:
-            dataset = SteelDatasetTrainVal(self.train_df, self.data_dir, True)
+            dataset = SteelDatasetTrainVal(self.train_df, self.data_dir, transforms.copy(), True)
         else:
-            dataset = SteelDatasetTest(self.df, self.data_dir)
+            dataset = SteelDatasetTest(self.df, self.data_dir, transforms.copy())
         self.n_samples = len(dataset)
         super().__init__(dataset, batch_size, shuffle, num_workers=nworkers)
 
@@ -44,5 +47,6 @@ class SteelDataLoader(DataLoader):
         if self.val_df.empty:
             return None
         else:
-            dataset = SteelDatasetTrainVal(self.val_df, self.data_dir, False)
+            dataset = SteelDatasetTrainVal(
+                self.val_df, self.data_dir, self.transforms.copy(), False)
             return DataLoader(dataset, self.batch_size, num_workers=self.nworkers)

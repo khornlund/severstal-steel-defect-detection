@@ -14,7 +14,7 @@ class Trainer(BaseTrainer):
         Inherited from BaseTrainer.
     """
     def __init__(self, model, loss, metrics, optimizer, resume, config, device,
-                 data_loader, valid_data_loader=None, lr_scheduler=None, unfreeze_encoder=None):
+                 data_loader, valid_data_loader=None, lr_scheduler=None):
         super().__init__(model, loss, metrics, optimizer, resume, config, device)
         self.config = config
         self.data_loader = data_loader
@@ -22,14 +22,7 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
-
-        if unfreeze_encoder is not None:
-            self.logger.info(f'Freezing encoder weights until epoch {unfreeze_encoder}')
-            for param in model.encoder.parameters():
-                param.requires_grad = False
-            self.unfreeze_encoder = unfreeze_encoder
-        else:
-            self.unfreeze_encoder = np.inf
+        self.unfreeze_encoder = config['training']['unfreeze_encoder']
 
     def _eval_metrics(self, output, target, log=True):
         with torch.no_grad():
@@ -56,13 +49,19 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
-        self.model.train()
-        if epoch > self.unfreeze_encoder:
+        if self.unfreeze_encoder is not None and epoch + 1 > self.unfreeze_encoder:
             self.logger.info('Unfreezing encoder weights')
             for param in self.model.encoder.parameters():
                 param.requires_grad = True
-            self.unfreeze_encoder = np.inf
+            encoder_lr = self._get_lr() / 3
+            self.logger.info(f'Adding to optimizer with lr={encoder_lr}')
+            self.optimizer.add_param_group({
+                'params': self.model.encoder.parameters(),
+                'lr': encoder_lr
+            })
+            self.unfreeze_encoder = None
 
+        self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         self.writer.add_scalar('LR', self._get_lr())
 
@@ -89,7 +88,7 @@ class Trainer(BaseTrainer):
                 self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
                                 self.data_loader.n_samples, len(self.data_loader), loss.item())
             if batch_idx == 1:
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
                 # self.writer.add_image('target', make_grid(target.cpu(), nrow=8, normalize=True))
 
         log = {

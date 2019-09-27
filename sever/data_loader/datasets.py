@@ -2,50 +2,53 @@ import cv2
 from torch.utils.data import Dataset
 
 from .process import make_mask
-from .augmentation import get_transforms
 
 
-def read_greyscale(f):
-    return cv2.imread(str(f))[:, :, 0:1]  # select one channel
+class SteelDataset(Dataset):
 
+    img_folder = 'implement me!'
 
-class SteelDatasetTrainVal(Dataset):
-
-    def __init__(self, df, data_dir, train):
+    def __init__(self, df, data_dir, transforms):
         self.df = df
-        self.data_dir = data_dir / 'train_images'
-        self.train = train
-        self.transforms = get_transforms(train)
+        self.data_dir = data_dir / self.img_folder
+        self.transforms = transforms
         self.fnames = self.df.index.tolist()
 
+    def read_greyscale(self, idx):
+        f = self.fnames[idx]
+        return f, cv2.imread(str(self.data_dir / f))[:, :, 0:1]  # select one channel
+
+    def __len__(self):
+        return len(self.fnames)
+
+
+class SteelDatasetTrainVal(SteelDataset):
+
+    img_folder = 'train_images'
+
+    def __init__(self, df, data_dir, transforms, train):
+        super().__init__(df, data_dir, transforms)
+        self.transforms.build_transforms(train=train)
+
     def __getitem__(self, idx):
-        image_id, mask = make_mask(idx, self.df)
-        image_path = self.data_dir / image_id
-        img = read_greyscale(image_path)
+        mask = make_mask(idx, self.df)
+        _, img = self.read_greyscale(idx)
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']
         mask = augmented['mask']  # 1x256x1600x4
         mask = mask[0].permute(2, 0, 1)  # 1x4x256x1600
         return img, mask
 
-    def __len__(self):
-        return len(self.fnames)
 
+class SteelDatasetTest(SteelDataset):
 
-class SteelDatasetTest(Dataset):
+    img_folder = 'test_images'
 
-    def __init__(self, df, data_dir):
-        self.df = df
-        self.data_dir = data_dir / 'test_images'
-        self.transforms = get_transforms(False)
-        self.fnames = self.df.index.tolist()
+    def __init__(self, df, data_dir, transforms):
+        super().__init__(df, data_dir, transforms)
+        self.transforms.build_transforms(train=False)
 
     def __getitem__(self, idx):
-        fname = self.fnames[idx]
-        path = str(self.data_dir / fname)
-        image = read_greyscale(path)
+        f, image = self.read_greyscale(idx)
         images = self.transform(image=image)["image"]
-        return fname, images
-
-    def __len__(self):
-        return len(self.fnames)
+        return f, images

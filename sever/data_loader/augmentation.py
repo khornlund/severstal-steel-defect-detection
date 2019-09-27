@@ -1,55 +1,83 @@
 import abc
+from copy import deepcopy
 
-from albumentations import HorizontalFlip, Normalize, Compose
+from albumentations import (HorizontalFlip, VerticalFlip, Normalize, Compose, RandomContrast,
+                            RandomBrightness)
 from albumentations.torch import ToTensor
-import torchvision.transforms as T
-
-MEAN = [0.3439]
-STD = [0.0383]
-
-
-def get_transforms(train):
-    list_transforms = []
-    if train == "train":
-        list_transforms.extend(
-            [
-                HorizontalFlip(p=0.5),  # only horizontal flip as of now
-            ]
-        )
-    list_transforms.extend(
-        [
-            Normalize(mean=MEAN, std=STD),
-            ToTensor(),
-        ]
-    )
-    list_trfms = Compose(list_transforms)
-    return list_trfms
 
 
 class AugmentationBase(abc.ABC):
 
-    def __init__(self, train):
-        self.train = train
-        self.transform = self.build_transforms()
+    def __init__(self):
+        self.transform = self.notimplemented
+
+    def build_transforms(self, train):
+        if train:
+            self.transform = self.build_train()
+        else:
+            self.transform = self.build_test()
 
     @abc.abstractmethod
-    def build_transforms(self):
+    def build_train(self):
         pass
 
-    def __call__(self, images):
-        return self.transform(images)
+    @abc.abstractmethod
+    def build_test(self):
+        pass
+
+    def notimplemented(self, *args, **kwargs):
+        raise Exception('You must call `build_transforms()` before using me!')
+
+    def __call__(self, *args, **kwargs):
+        return self.transform(*args, **kwargs)
+
+    def copy(self):
+        return deepcopy(self)
 
 
-class NormalizeTransforms(AugmentationBase):
+class LightTransforms(AugmentationBase):
 
-    MEANS = (0.1307,)
-    STDS  = (0.3081,)
+    MEAN = [0.3439]
+    STD  = [0.0383]
 
-    def __init__(self, train):
-        super().__init__(train)
+    def __init__(self):
+        super().__init__()
 
-    def build_transforms(self):
-        return T.Compose([
-            T.ToTensor(),
-            T.Normalize(self.MEANS, self.STDS)
+    def build_train(self):
+        return Compose([
+            HorizontalFlip(p=0.5),
+            VerticalFlip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+    def build_test(self):
+        return Compose([
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+
+class MediumTransforms(AugmentationBase):
+
+    MEAN = [0.3439]
+    STD  = [0.0383]
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
+        return Compose([
+            HorizontalFlip(p=0.5),
+            VerticalFlip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            RandomContrast(p=0.2),
+            RandomBrightness(p=0.2),
+            ToTensor(),
+        ])
+
+    def build_test(self):
+        return Compose([
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
         ])
