@@ -3,6 +3,7 @@ import math
 
 import yaml
 import torch
+import torch.distributed as dist
 from apex import amp
 
 from sever.utils import setup_logger, trainer_paths, TensorboardWriter
@@ -20,6 +21,7 @@ class BaseTrainer:
         self.metrics = metrics
         self.optimizer = optimizer
         self.config = config
+        self.rank = config['local_rank']
 
         cfg_trainer = config['training']
         self.epochs = cfg_trainer['epochs']
@@ -42,7 +44,7 @@ class BaseTrainer:
         # setup directory for checkpoint saving
         self.checkpoint_dir, writer_dir = trainer_paths(config)
         # setup visualization writer instance
-        self.writer = TensorboardWriter(writer_dir, self.logger, cfg_trainer['tensorboard'])
+        self.writer = TensorboardWriter(writer_dir, cfg_trainer['tensorboard'], str(self.rank))
 
         # Save configuration file into checkpoint directory:
         config_save_path = os.path.join(self.checkpoint_dir, 'config.yaml')
@@ -123,6 +125,11 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
+        self.logger.debug(f'Trainer {self.rank} waiting at save point')
+        dist.barrier()  # sync
+        if self.config['rank'] != 0:
+            return
+
         arch = type(self.model).__name__
         state = {
             'arch': arch,
@@ -135,7 +142,7 @@ class BaseTrainer:
         }
         filename = os.path.join(self.checkpoint_dir, f'checkpoint-epoch{epoch}.pth')
         torch.save(state, filename)
-        self.logger.info(f"Saving checkpoint: {filename} ...")
+        self.logger.info(f"Trainer {self.rank} saving checkpoint: {filename} ...")
         if save_best:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
             torch.save(state, best_path)
@@ -167,5 +174,6 @@ class BaseTrainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         amp.load_state_dict(checkpoint['amp'])
-
+        self.logger.debug(f'Trainer {self.rank} waiting to resume training')
+        dist.barrier()
         self.logger.info(f'Checkpoint "{resume_path}" (epoch {self.start_epoch}) loaded')

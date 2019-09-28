@@ -1,8 +1,14 @@
 short_name: sever
-n_gpu: 1
 save_dir: saved/
 seed: 1234
 apex: 'O1'
+
+distributed:
+  master_addr: 127.0.0.1
+  master_port: 29500
+  n_nodes: 1
+  node_rank: 0
+  nproc_per_node: 2
 
 arch:
   type: Unet
@@ -13,11 +19,6 @@ arch:
     in_channels: 1
     activation: null
 
-augmentation:
-  type: NormalizeTransforms
-  args:
-    train: true
-
 data_loader:
   type: SteelDataLoader
   args:
@@ -27,12 +28,14 @@ data_loader:
     shuffle: true
     validation_split: 0.2
 
+augmentation: MediumTransforms
+
 loss: CombinedBCEDice
 
 lr_scheduler:
   type: MultiStepLR
   args:
-    gamma: 0.1
+    gamma: 0.2
     milestones: [5, 12, 20]
 
 metrics:
