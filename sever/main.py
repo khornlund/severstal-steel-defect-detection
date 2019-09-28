@@ -1,18 +1,13 @@
 import os
-import sys
-import subprocess
 import random
 import multiprocessing as mp
-from argparse import ArgumentParser, REMAINDER
 
 from apex import amp
+from apex.parallel import convert_syncbn_model
 from apex.parallel import DistributedDataParallel as DPP
 import numpy as np
 import torch
-# import torch.multiprocessing as mp
 import torch.distributed as dist
-# from torch.distributed import launch
-# from torch.nn.parallel import DistributedDataParallel as DPP
 import segmentation_models_pytorch as module_arch
 
 import sever.data_loader.data_loaders as module_data
@@ -32,8 +27,6 @@ class Worker:
 
     @classmethod
     def spawn(cls, env, config, resume_filename):
-        # print(f'CURRENT ENV: {os.environ}')
-        # print(f'RECEIVED ENV: {env}')
         os.environ = env
         config['local_rank'] = int(env['LOCAL_RANK'])
         config['world_size'] = int(env['WORLD_SIZE'])
@@ -72,6 +65,7 @@ class Worker:
         opt_level = config['apex']
         self.logger.debug(f'Setting apex opt_level: {opt_level}')
         model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
+        model = convert_syncbn_model(model)
 
         lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
                                     config, optimizer)

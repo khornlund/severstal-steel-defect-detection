@@ -127,7 +127,7 @@ class BaseTrainer:
         """
         self.logger.debug(f'Trainer {self.rank} waiting at save point')
         dist.barrier()  # sync
-        if self.config['rank'] != 0:
+        if self.rank != 0:
             return
 
         arch = type(self.model).__name__
