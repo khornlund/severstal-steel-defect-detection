@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 
 from .datasets import SteelDatasetTrainVal, SteelDatasetTest
 
@@ -12,13 +12,12 @@ class SteelDataLoader(DataLoader):
     train_csv = 'train.csv'
     test_csv  = 'sample_submission.csv'
 
-    def __init__(self, transforms, data_dir, batch_size, shuffle, validation_split, nworkers,
-                 train=True
+    def __init__(self, rank, world_size, transforms, data_dir, batch_size, shuffle,
+                 validation_split, nworkers, pin_memory=True, train=True
     ):  # noqa
-        self.transforms = transforms
+        self.rank, self.world_size, self.transforms = rank, world_size, transforms
+        self.batch_size, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
         self.data_dir = Path(data_dir)
-        self.batch_size = batch_size
-        self.nworkers = nworkers
 
         self.train_df, self.val_df = self.load_df(train, validation_split)
 
@@ -26,8 +25,11 @@ class SteelDataLoader(DataLoader):
             dataset = SteelDatasetTrainVal(self.train_df, self.data_dir, transforms.copy(), True)
         else:
             dataset = SteelDatasetTest(self.df, self.data_dir, transforms.copy())
+
         self.n_samples = len(dataset)
-        super().__init__(dataset, batch_size, shuffle, num_workers=nworkers)
+        sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=shuffle)
+        super().__init__(dataset, batch_size, sampler=sampler,
+                         num_workers=nworkers, pin_memory=pin_memory)
 
     def load_df(self, train, validation_split):
         csv_filename = self.train_csv if train else self.test_csv
@@ -49,4 +51,6 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTrainVal(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
-            return DataLoader(dataset, self.batch_size, num_workers=self.nworkers)
+            sampler = DistributedSampler(dataset, num_replicas=self.world_size, rank=self.rank)
+            return DataLoader(dataset, self.batch_size, sampler=sampler,
+                              num_workers=self.nworkers, pin_memory=self.pin_memory)

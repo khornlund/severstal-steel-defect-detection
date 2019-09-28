@@ -49,21 +49,27 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
-        if self.unfreeze_encoder is not None and epoch + 1 > self.unfreeze_encoder:
-            self.logger.info('Unfreezing encoder weights')
-            for param in self.model.encoder.parameters():
-                param.requires_grad = True
-            encoder_lr = self._get_lr() / 3
-            self.logger.info(f'Adding to optimizer with lr={encoder_lr}')
-            self.optimizer.add_param_group({
-                'params': self.model.encoder.parameters(),
-                'lr': encoder_lr
-            })
-            self.unfreeze_encoder = None
+        # if self.unfreeze_encoder is not None and epoch + 1 > self.unfreeze_encoder:
+        #     self.logger.info('Unfreezing encoder weights')
+        #     for param in self.model.module.encoder.parameters():
+        #         param.requires_grad = True
+        #     encoder_lr = self._get_lr()
+        #     self.logger.info(f'Adding to optimizer with lr={encoder_lr}')
+        #     self.optimizer.add_param_group({
+        #         'name': 'encoder',
+        #         'params': self.model.module.encoder.parameters(),
+        #         'lr': encoder_lr
+        #     })
+        #     self.unfreeze_encoder = None
 
         self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
-        self.writer.add_scalar('LR', self._get_lr())
+        for idx, param_group in enumerate(self.optimizer.param_groups):
+            if idx == 0:
+                name = 'Decoder_LR'
+            else:
+                name = 'Encoder_LR'
+            self.writer.add_scalar(name, param_group['lr'])
 
         total_loss = 0
         total_metrics = np.zeros(len(self.metrics))

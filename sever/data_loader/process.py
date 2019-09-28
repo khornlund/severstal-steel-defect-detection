@@ -21,10 +21,9 @@ def make_mask(row_id, df):
     '''Given a row index, return image_id and mask (256, 1600, 4) from the dataframe `df`'''
     labels = df.iloc[row_id][:4]
     masks = np.zeros((256, 1600, 4), dtype=np.float32)  # float32 is V.Imp
-    # 4:class 1～4 (ch:0～3)
 
     for idx, label in enumerate(labels.values):
-        if label is not np.nan:
+        if label == label:  # NaN check
             label = label.split(" ")
             positions = map(int, label[0::2])
             length = map(int, label[1::2])
