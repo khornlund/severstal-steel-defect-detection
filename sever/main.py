@@ -1,13 +1,14 @@
 import os
 import random
-import multiprocessing as mp
 
 from apex import amp
-from apex.parallel import convert_syncbn_model
+from apex.parallel import convert_syncbn_model  # noqa
 from apex.parallel import DistributedDataParallel as DPP
 import numpy as np
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.multiprocessing.spawn import _wrap, SpawnContext
 import segmentation_models_pytorch as module_arch
 
 import sever.data_loader.data_loaders as module_data
@@ -26,7 +27,7 @@ def get_instance(module, name, config, *args):
 class Worker:
 
     @classmethod
-    def spawn(cls, env, config, resume_filename):
+    def spawn(cls, process_num, env, config, resume_filename):
         os.environ = env
         config['local_rank'] = int(env['LOCAL_RANK'])
         config['world_size'] = int(env['WORLD_SIZE'])
@@ -65,7 +66,7 @@ class Worker:
         opt_level = config['apex']
         self.logger.debug(f'Setting apex opt_level: {opt_level}')
         model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
-        model = convert_syncbn_model(model)
+        # model = convert_syncbn_model(model)
 
         lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
                                     config, optimizer)
@@ -127,21 +128,14 @@ class Master:
 
         # set PyTorch distributed related environmental variables
         current_env = os.environ.copy()
-        current_env["MASTER_ADDR"] = master_addr
-        current_env["MASTER_PORT"] = str(master_port)
-        current_env["WORLD_SIZE"]  = str(dist_world_size)
+        current_env["MASTER_ADDR"]     = master_addr
+        current_env["MASTER_PORT"]     = str(master_port)
+        current_env["WORLD_SIZE"]      = str(dist_world_size)
+        current_env["OMP_NUM_THREADS"] = str(1)
 
+        ctx = mp.get_context('spawn')
+        error_queues = []
         processes = []
-        mp.set_start_method('spawn')
-
-        if 'OMP_NUM_THREADS' not in os.environ and nproc_per_node > 1:
-            current_env["OMP_NUM_THREADS"] = str(1)
-            print("*****************************************\n"
-                "Setting OMP_NUM_THREADS environment variable for each process "
-                "to be {} in default, to avoid your system being overloaded, "
-                "please further tune the variable for optimal performance in "
-                "your application as needed. \n"
-                "*****************************************".format(current_env["OMP_NUM_THREADS"]))
 
         for local_rank in range(0, nproc_per_node):
             # each process's rank
@@ -149,16 +143,19 @@ class Master:
             current_env["RANK"] = str(dist_rank)
             current_env["LOCAL_RANK"] = str(local_rank)
 
-            # spawn the processes
-            p = mp.Process(target=Worker.spawn, name=f'worker-rank-{local_rank}', kwargs={
-                'env': current_env,
-                'config': config,
-                'resume_filename': resume_filename
-            })
-            p.start()
-            processes.append(p)
+            args = (current_env.copy(), config, resume_filename)
 
-        for process in processes:
-            process.join()
-            if process.exitcode != 0:
-                raise Exception(f'Process {process.name} returned code {process.exitcode}')
+            # spawn the processes
+            error_queue = ctx.SimpleQueue()
+            process = ctx.Process(
+                target=_wrap,
+                args=(Worker.spawn, local_rank, args, error_queue)
+            )
+            process.start()
+            error_queues.append(error_queue)
+            processes.append(process)
+
+        # Loop on join until it returns True or raises an exception.
+        spawn_context = SpawnContext(processes, error_queues)
+        while not spawn_context.join():
+            pass

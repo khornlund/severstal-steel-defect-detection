@@ -44,7 +44,8 @@ class BaseTrainer:
         # setup directory for checkpoint saving
         self.checkpoint_dir, writer_dir = trainer_paths(config)
         # setup visualization writer instance
-        self.writer = TensorboardWriter(writer_dir, cfg_trainer['tensorboard'], str(self.rank))
+        tb_enabled = (cfg_trainer['tensorboard'] and (self.rank == 0))
+        self.writer = TensorboardWriter(writer_dir, tb_enabled)
 
         # Save configuration file into checkpoint directory:
         config_save_path = os.path.join(self.checkpoint_dir, 'config.yaml')

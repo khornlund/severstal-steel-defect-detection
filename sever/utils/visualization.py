@@ -8,10 +8,10 @@ except ImportError:
 
 
 class TensorboardWriter():
-    def __init__(self, writer_dir, enabled, filename_suffix=''):
+    def __init__(self, writer_dir, enabled):
         self.writer = None
         if enabled:
-            self.writer = SummaryWriter(writer_dir, filename_suffix=filename_suffix)
+            self.writer = SummaryWriter(writer_dir)
 
         self.step = 0
         self.mode = ''
