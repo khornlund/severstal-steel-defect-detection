@@ -55,5 +55,5 @@ class SteelDatasetTest(SteelDataset):
 
     def __getitem__(self, idx):
         f, image = self.read_greyscale(idx)
-        images = self.transform(image=image)["image"]
+        images = self.transforms(image=image)["image"]
         return f, images

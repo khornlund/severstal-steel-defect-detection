@@ -28,7 +28,7 @@ data_loader:
     shuffle: true
     validation_split: 0.2
 
-augmentation: MediumTransforms
+augmentation: LightTransforms
 
 loss: CombinedBCEDice
 
@@ -46,9 +46,9 @@ metrics:
   - dice_mean
 
 optimizer:
-  type: ApexFusedAdam
+  type: RAdam
   args:
-    lr: 0.0008
+    lr: 0.002
     weight_decay: 0.0005
 
 training:

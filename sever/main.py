@@ -3,11 +3,13 @@ import random
 
 from apex import amp
 from apex.parallel import convert_syncbn_model  # noqa
-from apex.parallel import DistributedDataParallel as DPP
+# from apex.parallel import DistributedDataParallel as DPP
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DPP
+# from torch.nn import SyncBatchNorm
 from torch.multiprocessing.spawn import _wrap, SpawnContext
 import segmentation_models_pytorch as module_arch
 
@@ -60,7 +62,7 @@ class Worker:
         config = self.config
         rank = config['local_rank']
         world_size = config['world_size']
-        self.logger.info(f'Worker {rank}/{world_size} starting...')
+        self.logger.info(f'Worker {rank+1}/{world_size} starting...')
 
         self.logger.debug('Building model architecture')
         model = get_instance(module_arch, 'arch', config)
@@ -80,13 +82,13 @@ class Worker:
         opt_level = config['apex']
         self.logger.debug(f'Setting apex opt_level: {opt_level}')
         model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
-        # model = convert_syncbn_model(model)
+        model = convert_syncbn_model(model)
 
         lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
                                     config, optimizer)
 
         self.logger.info(f'Using `DistributedDataParallel`')
-        model = DPP(model)
+        model = DPP(model, device_ids=[device])
         model, optimizer = self._resume_checkpoint(resume, rank, model, optimizer)
         peek_weights = model.module.encoder._conv_stem.weight[0]
         self.logger.debug(f'Peek weights: {peek_weights}')

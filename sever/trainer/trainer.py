@@ -40,6 +40,8 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.data_loader.sampler.set_epoch(epoch - 1)
+        peek_weights = self.model.module.encoder._conv_stem.weight[0]
+        self.logger.debug(f'Rank {self.rank}: peek weights: {peek_weights}')
         self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         for idx, param_group in enumerate(self.optimizer.param_groups):
@@ -55,6 +57,12 @@ class Trainer(BaseTrainer):
             loss = self.loss(output, target)
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
+            # peek_grads = []
+            # for i, p in enumerate(self.model.parameters()):
+            #     peek_grads.append(p.grad[0])
+            #     if i > 1:
+            #         break
+            # self.logger.debug(f'batch {batch_idx} rank {self.rank} peek grads: {peek_grads}')
             self.optimizer.step()
 
             if batch_idx % self.log_step == 0:
