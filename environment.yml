@@ -24,6 +24,7 @@ dependencies:
   - future
   - tqdm
   - kaggle
+  - albumentations
   - pip
   - pip:
     # apex
