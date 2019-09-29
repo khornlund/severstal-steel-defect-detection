@@ -46,7 +46,7 @@ metrics:
   - dice_mean
 
 optimizer:
-  type: RAdam
+  type: ApexFusedAdam
   args:
     lr: 0.0008
     weight_decay: 0.0005

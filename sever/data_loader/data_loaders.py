@@ -36,6 +36,7 @@ class SteelDataLoader(DataLoader):
         df['ImageId'], df['ClassId'] = zip(*df['ImageId_ClassId'].str.split('_'))
         df['ClassId'] = df['ClassId'].astype(int)
         df = df.pivot(index='ImageId', columns='ClassId', values='EncodedPixels')
+        df.columns = [f'rle{c}' for c in range(4)]
         df['defects'] = df.count(axis=1)
 
         if train and validation_split > 0:

@@ -7,6 +7,8 @@ from .process import make_mask
 class SteelDataset(Dataset):
 
     img_folder = 'implement me!'
+    N_CLASSES = 4
+    rle_cols = [f'rle{i}' for i in range(N_CLASSES)]
 
     def __init__(self, df, data_dir, transforms):
         self.df = df
@@ -17,6 +19,9 @@ class SteelDataset(Dataset):
     def read_greyscale(self, idx):
         f = self.fnames[idx]
         return f, cv2.imread(str(self.data_dir / f))[:, :, 0:1]  # select one channel
+
+    def rle(self, idx):
+        return self.df.iloc[idx][self.rle_cols]
 
     def __len__(self):
         return len(self.fnames)
@@ -31,7 +36,7 @@ class SteelDatasetTrainVal(SteelDataset):
         self.transforms.build_transforms(train=train)
 
     def __getitem__(self, idx):
-        mask = make_mask(idx, self.df)
+        mask = make_mask(self.rle(idx))
         _, img = self.read_greyscale(idx)
         augmented = self.transforms(image=img, mask=mask)
         img = augmented['image']

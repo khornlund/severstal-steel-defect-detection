@@ -1,5 +1,6 @@
 import os
 import math
+import shutil
 
 import yaml
 import torch
@@ -144,8 +145,8 @@ class BaseTrainer:
         self.logger.info(f"Trainer {self.rank} saving checkpoint: {filename} ...")
         if save_best:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
-            torch.save(state, best_path)
             self.logger.info(f'Saving current best: {best_path}')
+            shutil.copyfile(filename, best_path)
 
     def _reduce_tensor(self, t):
         rt = t.clone()

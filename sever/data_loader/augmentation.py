@@ -51,7 +51,6 @@ class LightTransforms(AugmentationBase):
     def build_train(self):
         return Compose([
             HorizontalFlip(p=0.5),
-            VerticalFlip(p=0.5),
             Normalize(mean=self.MEAN, std=self.STD),
             ToTensor(),
         ])
