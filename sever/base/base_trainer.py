@@ -6,6 +6,7 @@ import yaml
 import torch
 import torch.distributed as dist
 from apex import amp
+import horovod.torch as hvd
 
 from sever.utils import setup_logger, trainer_paths, TensorboardWriter
 
@@ -126,7 +127,7 @@ class BaseTrainer:
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
         self.logger.debug(f'Trainer {self.rank} waiting at save point')
-        dist.barrier()  # sync
+        # dist.barrier()  # sync
         if self.rank != 0:
             return
 
@@ -148,8 +149,7 @@ class BaseTrainer:
             self.logger.info(f'Saving current best: {best_path}')
             shutil.copyfile(filename, best_path)
 
-    def _reduce_tensor(self, t):
-        rt = t.clone()
-        dist.all_reduce(rt, op=dist.ReduceOp.SUM)
-        rt /= self.world_size
-        return rt
+    def _reduce_value(self, value, name):
+        t = torch.tensor(value)
+        t_avg = hvd.allreduce(t, name=name)
+        return t_avg.item()

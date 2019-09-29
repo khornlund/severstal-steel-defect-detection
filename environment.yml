@@ -25,8 +25,10 @@ dependencies:
   - tqdm
   - kaggle
   - albumentations
+  - gxx_linux-64
   - pip
   - pip:
+    - horovod
     # apex
     # segmentation-models-pytorch
     - -e .  # install package in development mode

@@ -27,6 +27,7 @@ data_loader:
     nworkers: 4
     shuffle: true
     validation_split: 0.2
+    pin_memory: false
 
 augmentation: LightTransforms
 

@@ -40,8 +40,8 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.data_loader.sampler.set_epoch(epoch - 1)
-        peek_weights = self.model.module.encoder._conv_stem.weight[0]
-        self.logger.debug(f'Rank {self.rank}: peek weights: {peek_weights}')
+        # peek_weights = self.model.encoder._conv_stem.weight[0]
+        # self.logger.debug(f'Rank {self.rank}: peek weights: {peek_weights}')
         self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         for idx, param_group in enumerate(self.optimizer.param_groups):
@@ -55,29 +55,26 @@ class Trainer(BaseTrainer):
             self.optimizer.zero_grad()
             output = self.model(data)
             loss = self.loss(output, target)
+
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
-            # peek_grads = []
-            # for i, p in enumerate(self.model.parameters()):
-            #     peek_grads.append(p.grad[0])
-            #     if i > 1:
-            #         break
-            # self.logger.debug(f'batch {batch_idx} rank {self.rank} peek grads: {peek_grads}')
-            self.optimizer.step()
+                self.optimizer.synchronize()
+            with self.optimizer.skip_synchronize():
+                self.optimizer.step()
 
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
 
-                rdc_loss = self._reduce_tensor(loss.data)
-                losses.update(rdc_loss.item(), data.size(0))
-                self.writer.add_scalar('loss', rdc_loss.item())
+                rdc_loss = self._reduce_value(loss.data, 'loss')
+                losses.update(rdc_loss, data.size(0))
+                self.writer.add_scalar('loss', rdc_loss)
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
                     self.writer.add_scalar(metrics[i].name, value)
 
                 if self.rank == 0:
                     self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
-                                    len(self.data_loader), rdc_loss.item())
+                                    len(self.data_loader), rdc_loss)
 
             if batch_idx == 1:
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
@@ -127,8 +124,8 @@ class Trainer(BaseTrainer):
                 output = self.model(data)
                 loss = self.loss(output, target)
 
-                rdc_loss = self._reduce_tensor(loss.data)
-                losses.update(rdc_loss.item(), data.size(0))
+                rdc_loss = self._reduce_value(loss, 'val_loss')
+                losses.update(rdc_loss, data.size(0))
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
 
@@ -146,7 +143,7 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for i, metric in enumerate(self.metrics):
                 value = metric(output, target)
-                reduced_value = self._reduce_tensor(value)
+                reduced_value = self._reduce_value(value, metric.__name__)
                 yield reduced_value
 
 

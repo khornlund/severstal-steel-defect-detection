@@ -1,10 +1,9 @@
 import click
-import yaml
 
 import torch
 
 from sever.main import Master
-from sever.utils import kaggle_upload
+from sever.utils import kaggle_upload, load_config
 
 
 @click.group()
@@ -35,19 +34,3 @@ def train(config_filename, resume):
                              'Add "-c experiments/config.yaml", for example.')
     for config in configs:
         Master.start(config, resume)
-
-
-def load_config(filename):
-    with open(filename) as fh:
-        config = yaml.safe_load(fh)
-
-    config['name'] = verbose_config_name(config)
-    return config
-
-
-def verbose_config_name(config):
-    short_name = config['short_name']
-    arch = f"{config['arch']['type']}-{config['arch']['args']['encoder_name']}"
-    loss = config['loss']
-    optim = config['optimizer']['type']
-    return '-'.join([short_name, arch, loss, optim])

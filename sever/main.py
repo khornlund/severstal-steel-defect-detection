@@ -2,24 +2,18 @@ import os
 import random
 
 from apex import amp
-from apex.parallel import convert_syncbn_model  # noqa
-# from apex.parallel import DistributedDataParallel as DPP
+# from apex.parallel import convert_syncbn_model  # noqa
 import numpy as np
 import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel as DPP
-# from torch.nn import SyncBatchNorm
-from torch.multiprocessing.spawn import _wrap, SpawnContext
 import segmentation_models_pytorch as module_arch
-
+import horovod.torch as hvd
 import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
 import sever.data_loader.augmentation as module_aug
 from sever.trainer import Trainer
-from sever.utils import setup_logger, setup_logging
+from sever.utils import setup_logger, setup_logging, load_config
 
 
 def get_instance(module, name, config, *args):
@@ -28,69 +22,52 @@ def get_instance(module, name, config, *args):
 
 class Worker:
 
-    @classmethod
-    def spawn(cls, process_num, env, config, resume_filename):
-        """
-        Entry point for a new process to start training.
-
-        Parameters
-        ----------
-        process_num : int
-            Not used. Included to match function signature used by
-            `torch.distributed.launch`.
-        env : dict
-            Environment state. Should include `LOCAL_RANK` and `WORLD_SIZE` settings.
-        config : dict
-            Config settings for training.
-        resume_filename : str
-            Path to model checkpoint to resume training (can be None).
-        """
-        os.environ = env
-        config['local_rank'] = int(env['LOCAL_RANK'])
-        config['world_size'] = int(env['WORLD_SIZE'])
-
-        w = Worker(config)
-        w.train(resume_filename)
-
     def __init__(self, config):
         setup_logging(config)
         self.logger = setup_logger(self, config['training']['verbose'])
         self._seed_everything(config['seed'])
         self.config = config
 
-    def train(self, resume):
+    def train(self, resume=''):
         config = self.config
-        rank = config['local_rank']
-        world_size = config['world_size']
-        self.logger.info(f'Worker {rank+1}/{world_size} starting...')
+        rank       = hvd.rank()
+        local_rank = hvd.local_rank()
+        world_size = hvd.size()
+        self.logger.info(f'Worker {local_rank+1}/{world_size} starting...')
+
+        config['rank']       = rank
+        config['local_rank'] = local_rank
+        config['world_size'] = world_size
 
         self.logger.debug('Building model architecture')
         model = get_instance(module_arch, 'arch', config)
 
-        self.logger.debug(f'Cuda device count: {torch.cuda.device_count()}')
-        device = torch.device(f'cuda:{rank}')
-        torch.cuda.set_device(device)
-        dist.init_process_group(backend='nccl', init_method='env://')
-
-        model = model.to(device)
+        device = torch.device(f'cuda:{local_rank}')
         self.logger.info(f'Using device {device}')
+        torch.cuda.set_device(device)
+        model = model.to(device)
 
         self.logger.debug('Building optimizer and lr scheduler')
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
         optimizer = get_instance(module_optimizer, 'optimizer', config, trainable_params)
 
+        # Horovod: broadcast parameters & optimizer state.
+        hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+
+        # Horovod: wrap optimizer with DistributedOptimizer.
+        optimizer = hvd.DistributedOptimizer(optimizer, named_parameters=model.named_parameters())
+
         opt_level = config['apex']
         self.logger.debug(f'Setting apex opt_level: {opt_level}')
         model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
-        model = convert_syncbn_model(model)
 
         lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
                                     config, optimizer)
 
         self.logger.info(f'Using `DistributedDataParallel`')
-        model = DPP(model, device_ids=[device])
         model, optimizer = self._resume_checkpoint(resume, rank, model, optimizer)
-        peek_weights = model.module.encoder._conv_stem.weight[0]
+        peek_weights = model.encoder._conv_stem.weight[0]
         self.logger.debug(f'Peek weights: {peek_weights}')
 
         self.logger.debug('Getting augmentations')
@@ -144,57 +121,19 @@ class Worker:
 
         amp.load_state_dict(checkpoint['amp'])
         self.logger.debug(f'Worker {rank} waiting to resume training')
-        dist.barrier()
+        # dist.barrier()
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer
 
 
-class Master:
-    """
-    Custom implementation of `torch.distributed.launch`.
-    """
+if __name__ == '__main__':
+    # Training settings
+    config_filename = 'experiments/config.yml'
+    config = load_config(config_filename)
 
-    @classmethod
-    def start(cls, config, resume_filename):
-        master_addr    = config['distributed']['master_addr']
-        master_port    = config['distributed']['master_port']
-        n_nodes        = config['distributed']['n_nodes']
-        node_rank      = config['distributed']['node_rank']
-        nproc_per_node = config['distributed']['nproc_per_node']
+    # Horovod: initialize library.
+    hvd.init()
+    torch.set_num_threads(8)
 
-        # world size in terms of number of processes
-        dist_world_size = nproc_per_node * n_nodes
-
-        # set PyTorch distributed related environmental variables
-        current_env = os.environ.copy()
-        current_env["MASTER_ADDR"]     = master_addr
-        current_env["MASTER_PORT"]     = str(master_port)
-        current_env["WORLD_SIZE"]      = str(dist_world_size)
-        current_env["OMP_NUM_THREADS"] = str(1)
-
-        ctx = mp.get_context('spawn')
-        error_queues = []
-        processes = []
-
-        for local_rank in range(0, nproc_per_node):
-            # each process's rank
-            dist_rank = nproc_per_node * node_rank + local_rank
-            current_env["RANK"] = str(dist_rank)
-            current_env["LOCAL_RANK"] = str(local_rank)
-
-            args = (current_env.copy(), config, resume_filename)
-
-            # spawn the processes
-            error_queue = ctx.SimpleQueue()
-            process = ctx.Process(
-                target=_wrap,
-                args=(Worker.spawn, local_rank, args, error_queue)
-            )
-            process.start()
-            error_queues.append(error_queue)
-            processes.append(process)
-
-        # Loop on join until it returns True or raises an exception.
-        spawn_context = SpawnContext(processes, error_queues)
-        while not spawn_context.join():
-            pass
+    # start
+    Worker(config).train()

@@ -13,7 +13,7 @@ class SteelDataLoader(DataLoader):
     test_csv  = 'sample_submission.csv'
 
     def __init__(self, rank, world_size, transforms, data_dir, batch_size, shuffle,
-                 validation_split, nworkers, pin_memory=True, train=True
+                 validation_split, nworkers, pin_memory=False, train=True
     ):  # noqa
         self.rank, self.world_size, self.transforms = rank, world_size, transforms
         self.batch_size, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
