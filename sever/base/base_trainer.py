@@ -4,7 +4,6 @@ import shutil
 
 import yaml
 import torch
-import torch.distributed as dist
 from apex import amp
 
 from sever.utils import setup_logger, trainer_paths, TensorboardWriter
@@ -22,8 +21,6 @@ class BaseTrainer:
         self.metrics = metrics
         self.optimizer = optimizer
         self.config = config
-        self.rank = config['local_rank']
-        self.world_size = config['world_size']
 
         cfg_trainer = config['training']
         self.epochs = cfg_trainer['epochs']
@@ -46,7 +43,7 @@ class BaseTrainer:
         # setup directory for checkpoint saving
         self.checkpoint_dir, writer_dir = trainer_paths(config)
         # setup visualization writer instance
-        tb_enabled = (cfg_trainer['tensorboard'] and (self.rank == 0))
+        tb_enabled = cfg_trainer['tensorboard']
         self.writer = TensorboardWriter(writer_dir, tb_enabled)
 
         # Save configuration file into checkpoint directory:
@@ -125,11 +122,6 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
-        self.logger.debug(f'Trainer {self.rank} waiting at save point')
-        dist.barrier()  # sync
-        if self.rank != 0:
-            return
-
         arch = type(self.model).__name__
         state = {
             'arch': arch,
@@ -142,14 +134,8 @@ class BaseTrainer:
         }
         filename = os.path.join(self.checkpoint_dir, f'checkpoint-epoch{epoch}.pth')
         torch.save(state, filename)
-        self.logger.info(f"Trainer {self.rank} saving checkpoint: {filename} ...")
         if save_best:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
             self.logger.info(f'Saving current best: {best_path}')
             shutil.copyfile(filename, best_path)
 
-    def _reduce_tensor(self, t):
-        rt = t.clone()
-        dist.all_reduce(rt, op=dist.ReduceOp.SUM)
-        rt /= self.world_size
-        return rt

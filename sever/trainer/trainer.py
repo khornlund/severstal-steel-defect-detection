@@ -39,9 +39,6 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
-        self.data_loader.sampler.set_epoch(epoch - 1)
-        peek_weights = self.model.module.encoder._conv_stem.weight[0]
-        self.logger.debug(f'Rank {self.rank}: peek weights: {peek_weights}')
         self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         for idx, param_group in enumerate(self.optimizer.param_groups):
@@ -57,27 +54,19 @@ class Trainer(BaseTrainer):
             loss = self.loss(output, target)
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
-            # peek_grads = []
-            # for i, p in enumerate(self.model.parameters()):
-            #     peek_grads.append(p.grad[0])
-            #     if i > 1:
-            #         break
-            # self.logger.debug(f'batch {batch_idx} rank {self.rank} peek grads: {peek_grads}')
             self.optimizer.step()
 
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
 
-                rdc_loss = self._reduce_tensor(loss.data)
-                losses.update(rdc_loss.item(), data.size(0))
-                self.writer.add_scalar('loss', rdc_loss.item())
+                losses.update(loss.item(), data.size(0))
+                self.writer.add_scalar('loss', loss.item())
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
                     self.writer.add_scalar(metrics[i].name, value)
 
-                if self.rank == 0:
-                    self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
-                                    len(self.data_loader), rdc_loss.item())
+                self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
+                                len(self.data_loader), loss.item())
 
             if batch_idx == 1:
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
@@ -116,7 +105,6 @@ class Trainer(BaseTrainer):
         Note:
             The validation metrics in log must have the key 'val_metrics'.
         """
-        self.valid_data_loader.sampler.set_epoch(epoch - 1)
         self.model.eval()
         losses = AverageMeter('loss')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
@@ -127,8 +115,7 @@ class Trainer(BaseTrainer):
                 output = self.model(data)
                 loss = self.loss(output, target)
 
-                rdc_loss = self._reduce_tensor(loss.data)
-                losses.update(rdc_loss.item(), data.size(0))
+                losses.update(loss.item(), data.size(0))
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
 
@@ -146,8 +133,7 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for i, metric in enumerate(self.metrics):
                 value = metric(output, target)
-                reduced_value = self._reduce_tensor(value)
-                yield reduced_value
+                yield value
 
 
 class AverageMeter(object):

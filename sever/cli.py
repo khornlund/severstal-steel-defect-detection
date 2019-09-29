@@ -3,7 +3,7 @@ import yaml
 
 import torch
 
-from sever.main import Master
+from sever.main import Runner
 from sever.utils import kaggle_upload
 
 
@@ -34,7 +34,7 @@ def train(config_filename, resume):
         raise AssertionError('Configuration file need to be specified. '
                              'Add "-c experiments/config.yaml", for example.')
     for config in configs:
-        Master.start(config, resume)
+        Runner(config).train(resume)
 
 
 def load_config(filename):

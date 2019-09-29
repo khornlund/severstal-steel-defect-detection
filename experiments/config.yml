@@ -22,7 +22,7 @@ arch:
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 8
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
