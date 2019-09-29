@@ -13,25 +13,15 @@ class Trainer(BaseTrainer):
     Note:
         Inherited from BaseTrainer.
     """
-    def __init__(self, model, loss, metrics, optimizer, resume, config, device,
+    def __init__(self, model, loss, metrics, optimizer, config, device,
                  data_loader, valid_data_loader=None, lr_scheduler=None):
-        super().__init__(model, loss, metrics, optimizer, resume, config, device)
+        super().__init__(model, loss, metrics, optimizer, config, device)
         self.config = config
         self.data_loader = data_loader
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size))
-        self.unfreeze_encoder = config['training']['unfreeze_encoder']
-
-    def _eval_metrics(self, output, target, log=True):
-        with torch.no_grad():
-            acc_metrics = np.zeros(len(self.metrics))
-            for i, metric in enumerate(self.metrics):
-                acc_metrics[i] += metric(output, target)
-                if log:
-                    self.writer.add_scalar(f'{metric.__name__}', acc_metrics[i])
-            return acc_metrics
+        self.log_step = int(np.sqrt(data_loader.batch_size)) * 4
 
     def _train_epoch(self, epoch):
         """
@@ -49,57 +39,44 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
-        # if self.unfreeze_encoder is not None and epoch + 1 > self.unfreeze_encoder:
-        #     self.logger.info('Unfreezing encoder weights')
-        #     for param in self.model.module.encoder.parameters():
-        #         param.requires_grad = True
-        #     encoder_lr = self._get_lr()
-        #     self.logger.info(f'Adding to optimizer with lr={encoder_lr}')
-        #     self.optimizer.add_param_group({
-        #         'name': 'encoder',
-        #         'params': self.model.module.encoder.parameters(),
-        #         'lr': encoder_lr
-        #     })
-        #     self.unfreeze_encoder = None
-
+        self.data_loader.sampler.set_epoch(epoch - 1)
         self.model.train()
         self.writer.set_step((epoch - 1) * len(self.data_loader))
         for idx, param_group in enumerate(self.optimizer.param_groups):
-            if idx == 0:
-                name = 'Decoder_LR'
-            else:
-                name = 'Encoder_LR'
-            self.writer.add_scalar(name, param_group['lr'])
+            self.writer.add_scalar('LR', param_group['lr'])
 
-        total_loss = 0
-        total_metrics = np.zeros(len(self.metrics))
+        losses = AverageMeter('loss')
+        metrics = [AverageMeter(m.__name__) for m in self.metrics]
+
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
-            # self.logger.debug(f'data: {data.size()}, target: {target.size()}')
             self.optimizer.zero_grad()
             output = self.model(data)
-            # self.logger.debug(f'output: {output.size()}')
             loss = self.loss(output, target)
-            # loss.backward()
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
             self.optimizer.step()
 
-            self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
-            self.writer.add_scalar('loss', loss.item())
-            total_loss += loss.item()
-            total_metrics += self._eval_metrics(output, target)
-
             if batch_idx % self.log_step == 0:
-                self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
-                                self.data_loader.n_samples, len(self.data_loader), loss.item())
+                self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
+
+                rdc_loss = self._reduce_tensor(loss.data)
+                losses.update(rdc_loss.item(), data.size(0))
+                self.writer.add_scalar('loss', rdc_loss.item())
+                for i, value in enumerate(self._eval_metrics(output, target)):
+                    metrics[i].update(value, data.size(0))
+                    self.writer.add_scalar(metrics[i].name, value)
+
+                if self.rank == 0:
+                    self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
+                                    len(self.data_loader), rdc_loss.item())
+
             if batch_idx == 1:
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
-                # self.writer.add_image('target', make_grid(target.cpu(), nrow=8, normalize=True))
 
         log = {
-            'loss': total_loss / len(self.data_loader),
-            'metrics': (total_metrics / len(self.data_loader)).tolist()
+            'loss': losses.avg,
+            'metrics': [m.avg for m in metrics]
         }
 
         if self.do_validation:
@@ -115,7 +92,8 @@ class Trainer(BaseTrainer):
         for param_group in self.optimizer.param_groups:
             return param_group['lr']
 
-    def _log_batch(self, epoch, batch_idx, batch_size, n_samples, len_data, loss):
+    def _log_batch(self, epoch, batch_idx, batch_size, len_data, loss):
+        n_samples = batch_size * len_data
         n_complete = batch_idx * batch_size
         percent = 100.0 * batch_idx / len_data
         msg = f'Train Epoch: {epoch} [{n_complete}/{n_samples} ({percent:.0f}%)] Loss: {loss:.6f}'
@@ -130,26 +108,54 @@ class Trainer(BaseTrainer):
         Note:
             The validation metrics in log must have the key 'val_metrics'.
         """
+        self.valid_data_loader.sampler.set_epoch(epoch - 1)
         self.model.eval()
-        total_val_loss = 0
-        total_val_metrics = np.zeros(len(self.metrics))
+        losses = AverageMeter('loss')
+        metrics = [AverageMeter(m.__name__) for m in self.metrics]
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
                 loss = self.loss(output, target)
-                total_val_loss += loss.item()
-                total_val_metrics += self._eval_metrics(output, target, log=False)
 
-        total_val_loss /= len(self.valid_data_loader)
-        total_val_metrics /= len(self.valid_data_loader)
+                rdc_loss = self._reduce_tensor(loss.data)
+                losses.update(rdc_loss.item(), data.size(0))
+                for i, value in enumerate(self._eval_metrics(output, target)):
+                    metrics[i].update(value, data.size(0))
+
         self.writer.set_step((epoch - 1), 'valid')
-        self.writer.add_scalar('loss', total_val_loss)
-        for i, metric in enumerate(self.metrics):
-            self.writer.add_scalar(f'{metric.__name__}', total_val_metrics[i])
+        self.writer.add_scalar('loss', losses.avg)
+        for m in metrics:
+            self.writer.add_scalar(m.name, m.avg)
 
         return {
-            'val_loss': total_val_loss,
-            'val_metrics': total_val_metrics.tolist()
+            'val_loss': losses.avg,
+            'val_metrics': [m.avg for m in metrics]
         }
+
+    def _eval_metrics(self, output, target):
+        with torch.no_grad():
+            for i, metric in enumerate(self.metrics):
+                value = metric(output, target)
+                reduced_value = self._reduce_tensor(value)
+                yield reduced_value
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self, name):
+        self.name = name
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count

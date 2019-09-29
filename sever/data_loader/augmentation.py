@@ -2,11 +2,17 @@ import abc
 from copy import deepcopy
 
 from albumentations import (HorizontalFlip, VerticalFlip, Normalize, Compose, RandomContrast,
-                            RandomBrightness)
+                            RandomBrightness, RandomSizedCrop, Cutout)
 from albumentations.torch import ToTensor
 
 
 class AugmentationBase(abc.ABC):
+
+    MEAN = [0.3439]
+    STD  = [0.0383]
+
+    H = 256
+    W = 1600
 
     def __init__(self):
         self.transform = self.notimplemented
@@ -21,9 +27,11 @@ class AugmentationBase(abc.ABC):
     def build_train(self):
         pass
 
-    @abc.abstractmethod
     def build_test(self):
-        pass
+        return Compose([
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
 
     def notimplemented(self, *args, **kwargs):
         raise Exception('You must call `build_transforms()` before using me!')
@@ -37,9 +45,6 @@ class AugmentationBase(abc.ABC):
 
 class LightTransforms(AugmentationBase):
 
-    MEAN = [0.3439]
-    STD  = [0.0383]
-
     def __init__(self):
         super().__init__()
 
@@ -51,17 +56,8 @@ class LightTransforms(AugmentationBase):
             ToTensor(),
         ])
 
-    def build_test(self):
-        return Compose([
-            Normalize(mean=self.MEAN, std=self.STD),
-            ToTensor(),
-        ])
-
 
 class MediumTransforms(AugmentationBase):
-
-    MEAN = [0.3439]
-    STD  = [0.0383]
 
     def __init__(self):
         super().__init__()
@@ -76,8 +72,20 @@ class MediumTransforms(AugmentationBase):
             ToTensor(),
         ])
 
-    def build_test(self):
+
+class HeavyTransforms(AugmentationBase):
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
         return Compose([
+            HorizontalFlip(p=0.5),
+            VerticalFlip(p=0.5),
             Normalize(mean=self.MEAN, std=self.STD),
+            RandomContrast(p=0.2),
+            RandomBrightness(p=0.2),
+            RandomSizedCrop((240, 256), self.H, self.W, w2h_ratio=1600 / 256),
+            Cutout(max_h_size=32, max_w_size=32),
             ToTensor(),
         ])

@@ -26,7 +26,6 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTest(self.df, self.data_dir, transforms.copy())
 
-        self.n_samples = len(dataset)
         sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=shuffle)
         super().__init__(dataset, batch_size, sampler=sampler,
                          num_workers=nworkers, pin_memory=pin_memory)
@@ -52,5 +51,5 @@ class SteelDataLoader(DataLoader):
             dataset = SteelDatasetTrainVal(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
             sampler = DistributedSampler(dataset, num_replicas=self.world_size, rank=self.rank)
-            return DataLoader(dataset, self.batch_size, sampler=sampler,
+            return DataLoader(dataset, self.batch_size * 2, sampler=sampler,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)

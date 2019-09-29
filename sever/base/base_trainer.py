@@ -13,7 +13,7 @@ class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, loss, metrics, optimizer, resume, config, device):
+    def __init__(self, model, loss, metrics, optimizer, config, device):
         self.logger = setup_logger(self, verbose=config['training']['verbose'])
         self.model = model
         self.device = device
@@ -22,6 +22,7 @@ class BaseTrainer:
         self.optimizer = optimizer
         self.config = config
         self.rank = config['local_rank']
+        self.world_size = config['world_size']
 
         cfg_trainer = config['training']
         self.epochs = cfg_trainer['epochs']
@@ -51,9 +52,6 @@ class BaseTrainer:
         config_save_path = os.path.join(self.checkpoint_dir, 'config.yaml')
         with open(config_save_path, 'w') as handle:
             yaml.dump(config, handle, default_flow_style=False)
-
-        if resume:
-            self._resume_checkpoint(resume)
 
     def train(self):
         """
@@ -149,32 +147,8 @@ class BaseTrainer:
             torch.save(state, best_path)
             self.logger.info(f'Saving current best: {best_path}')
 
-    def _resume_checkpoint(self, resume_path):
-        """
-        Resume from saved checkpoints
-
-        :param resume_path: Checkpoint path to be resumed
-        """
-        self.logger.info(f'Loading checkpoint: {resume_path}')
-        checkpoint = torch.load(resume_path)
-        self.start_epoch = checkpoint['epoch'] + 1
-        self.mnt_best = checkpoint['monitor_best']
-
-        # load architecture params from checkpoint.
-        if checkpoint['config']['arch'] != self.config['arch']:
-            self.logger.warning("Warning: Architecture configuration given in config file is "
-                                "different from that of checkpoint. This may yield an "
-                                "exception while state_dict is being loaded.")
-        self.model.load_state_dict(checkpoint['state_dict'])
-
-        # load optimizer state from checkpoint only when optimizer type is not changed.
-        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
-            self.logger.warning("Warning: Optimizer type given in config file is different from "
-                                "that of checkpoint. Optimizer parameters not being resumed.")
-        else:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
-
-        amp.load_state_dict(checkpoint['amp'])
-        self.logger.debug(f'Trainer {self.rank} waiting to resume training')
-        dist.barrier()
-        self.logger.info(f'Checkpoint "{resume_path}" (epoch {self.start_epoch}) loaded')
+    def _reduce_tensor(self, t):
+        rt = t.clone()
+        dist.all_reduce(rt, op=dist.ReduceOp.SUM)
+        rt /= self.world_size
+        return rt

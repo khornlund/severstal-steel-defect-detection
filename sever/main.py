@@ -28,13 +28,27 @@ class Worker:
 
     @classmethod
     def spawn(cls, process_num, env, config, resume_filename):
+        """
+        Entry point for a new process to start training.
+
+        Parameters
+        ----------
+        process_num : int
+            Not used. Included to match function signature used by
+            `torch.distributed.launch`.
+        env : dict
+            Environment state. Should include `LOCAL_RANK` and `WORLD_SIZE` settings.
+        config : dict
+            Config settings for training.
+        resume_filename : str
+            Path to model checkpoint to resume training (can be None).
+        """
         os.environ = env
         config['local_rank'] = int(env['LOCAL_RANK'])
         config['world_size'] = int(env['WORLD_SIZE'])
 
         w = Worker(config)
         w.train(resume_filename)
-        w.cleanup()
 
     def __init__(self, config):
         setup_logging(config)
@@ -73,6 +87,9 @@ class Worker:
 
         self.logger.info(f'Using `DistributedDataParallel`')
         model = DPP(model)
+        model, optimizer = self._resume_checkpoint(resume, rank, model, optimizer)
+        peek_weights = model.module.encoder._conv_stem.weight[0]
+        self.logger.debug(f'Peek weights: {peek_weights}')
 
         self.logger.debug('Getting augmentations')
         transforms = getattr(module_aug, config['augmentation'])()
@@ -87,12 +104,11 @@ class Worker:
 
         self.logger.debug('Initialising trainer')
         trainer = Trainer(model, loss, metrics, optimizer,
-                        resume=resume,
-                        config=config,
-                        device=device,
-                        data_loader=data_loader,
-                        valid_data_loader=valid_data_loader,
-                        lr_scheduler=lr_scheduler)
+                          config=config,
+                          device=device,
+                          data_loader=data_loader,
+                          valid_data_loader=valid_data_loader,
+                          lr_scheduler=lr_scheduler)
 
         trainer.train()
         self.logger.debug('Finished!')
@@ -105,14 +121,35 @@ class Worker:
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
 
-    def cleanup(self):
-        self.logger.info('Cleanup: destroying process group')
-        dist.destroy_process_group()
+    def _resume_checkpoint(self, resume_path, rank, model, optimizer):
+        """
+        Resume from saved checkpoint.
+        """
+        if not resume_path:
+            return model, optimizer
+
+        self.logger.info(f'Loading checkpoint: {resume_path}')
+        map_location = f'cuda:{rank}'
+        checkpoint = torch.load(resume_path, map_location=map_location)
+        model.load_state_dict(checkpoint['state_dict'])
+
+        # load optimizer state from checkpoint only when optimizer type is not changed.
+        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
+            self.logger.warning("Warning: Optimizer type given in config file is different from "
+                                "that of checkpoint. Optimizer parameters not being resumed.")
+        else:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+
+        amp.load_state_dict(checkpoint['amp'])
+        self.logger.debug(f'Worker {rank} waiting to resume training')
+        dist.barrier()
+        self.logger.info(f'Checkpoint "{resume_path}" loaded')
+        return model, optimizer
 
 
 class Master:
     """
-    Custom implementation of `torch.distributed.launch`
+    Custom implementation of `torch.distributed.launch`.
     """
 
     @classmethod
