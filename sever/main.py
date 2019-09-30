@@ -10,6 +10,7 @@ import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
+import sever.model.scheduler as module_scheduler
 import sever.data_loader.augmentation as module_aug
 from sever.trainer import Trainer
 from sever.utils import setup_logger, setup_logging
@@ -48,8 +49,7 @@ class Runner:
         self.logger.debug(f'Setting apex opt_level: {opt_level}')
         model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
 
-        lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
-                                    config, optimizer)
+        lr_scheduler = get_instance(module_scheduler, 'lr_scheduler', config, optimizer)
 
         model, optimizer = self._resume_checkpoint(resume, model, optimizer)
 

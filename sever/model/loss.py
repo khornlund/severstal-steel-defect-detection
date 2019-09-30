@@ -42,7 +42,7 @@ class CombinedBCEDice(CombinedLoss):
     def forward(self, logits, labels):
         bce_loss = self.bce(logits, labels)
         dice_loss = self.soft_dice(logits, labels)
-        return bce_loss + dice_loss
+        return (bce_loss + dice_loss), bce_loss, dice_loss
 
 
 class CombinedBCELogDice(CombinedLoss):

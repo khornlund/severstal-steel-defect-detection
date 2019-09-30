@@ -12,6 +12,7 @@ arch:
     classes: 4
     in_channels: 1
     activation: null
+    dropout: 0.1
 
 data_loader:
   type: SteelDataLoader
@@ -30,7 +31,7 @@ lr_scheduler:
   type: MultiStepLR
   args:
     gamma: 0.1
-    milestones: [4, 10, 16]
+    milestones: [2, 10, 20]
 
 metrics:
   - dice_0
@@ -46,7 +47,7 @@ optimizer:
     weight_decay: 0.0005
 
 training:
-  early_stop: 5
+  early_stop: 10
   epochs: 30
   monitor: min val_loss
   save_period: 1

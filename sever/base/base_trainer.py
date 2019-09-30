@@ -38,7 +38,7 @@ class BaseTrainer:
             self.mnt_best = math.inf if self.mnt_mode == 'min' else -math.inf
             self.early_stop = cfg_trainer.get('early_stop', math.inf)
 
-        self.start_epoch = 1
+        self.start_epoch = 0
 
         # setup directory for checkpoint saving
         self.checkpoint_dir, writer_dir = trainer_paths(config)
@@ -56,7 +56,7 @@ class BaseTrainer:
         Full training logic
         """
         self.logger.info('Starting training...')
-        for epoch in range(self.start_epoch, self.epochs + 1):
+        for epoch in range(self.start_epoch, self.epochs):
             result = self._train_epoch(epoch)
 
             # save logged informations into log dict
@@ -138,4 +138,3 @@ class BaseTrainer:
             best_path = os.path.join(self.checkpoint_dir, 'model_best.pth')
             self.logger.info(f'Saving current best: {best_path}')
             shutil.copyfile(filename, best_path)
-

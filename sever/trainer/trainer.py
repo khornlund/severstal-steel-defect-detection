@@ -40,39 +40,52 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
-        self.writer.set_step((epoch - 1) * len(self.data_loader))
-        for idx, param_group in enumerate(self.optimizer.param_groups):
-            self.writer.add_scalar('LR', param_group['lr'])
+        self.writer.set_step((epoch) * len(self.data_loader))
+        self.writer.add_scalar('LR', self._get_lr())
 
-        losses = AverageMeter('loss')
+        losses_comb = AverageMeter('loss_comb')
+        losses_bce  = AverageMeter('loss_bce')
+        losses_dice = AverageMeter('loss_dice')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
-            loss = self.loss(output, target)
+            loss, bce, dice = self.loss(output, target)
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
             self.optimizer.step()
 
-            if batch_idx % self.log_step == 0:
-                self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
+            losses_comb.update(loss.item(), data.size(0))
+            losses_bce.update(bce.item(),   data.size(0))
+            losses_dice.update(dice.item(), data.size(0))
 
-                losses.update(loss.item(), data.size(0))
-                self.writer.add_scalar('loss', loss.item())
+            if batch_idx % self.log_step == 0:
+                self.writer.set_step((epoch) * len(self.data_loader) + batch_idx)
+
+                self.writer.add_scalar('batch/loss', loss.item())
+                self.writer.add_scalar('batch/bce',  bce.item())
+                self.writer.add_scalar('batch/dice', dice.item())
+
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
-                    self.writer.add_scalar(metrics[i].name, value)
+                    self.writer.add_scalar(f'batch/{metrics[i].name}', value)
 
                 self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
                                 len(self.data_loader), loss.item())
+
+            self.writer.add_scalar('epoch/loss', losses_comb.avg)
+            self.writer.add_scalar('epoch/bce',  losses_bce.avg)
+            self.writer.add_scalar('epoch/dice', losses_dice.avg)
+            for m in metrics:
+                self.writer.add_scalar(f'epoch/{m.name}', m.avg)
 
             if batch_idx == 1:
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
 
         log = {
-            'loss': losses.avg,
+            'loss': losses_comb.avg,
             'metrics': [m.avg for m in metrics]
         }
 
@@ -106,26 +119,33 @@ class Trainer(BaseTrainer):
             The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
-        losses = AverageMeter('loss')
+        losses_comb = AverageMeter('loss_comb')
+        losses_bce  = AverageMeter('loss_bce')
+        losses_dice = AverageMeter('loss_dice')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
-                loss = self.loss(output, target)
+                loss, bce, dice = self.loss(output, target)
 
-                losses.update(loss.item(), data.size(0))
+                losses_comb.update(loss.item(), data.size(0))
+                losses_bce.update(bce.item(),   data.size(0))
+                losses_dice.update(dice.item(), data.size(0))
+
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
 
-        self.writer.set_step((epoch - 1), 'valid')
-        self.writer.add_scalar('loss', losses.avg)
+        self.writer.set_step((epoch), 'valid')
+        self.writer.add_scalar('loss', losses_comb.avg)
+        self.writer.add_scalar('bce', losses_bce.avg)
+        self.writer.add_scalar('dice', losses_dice.avg)
         for m in metrics:
             self.writer.add_scalar(m.name, m.avg)
 
         return {
-            'val_loss': losses.avg,
+            'val_loss': losses_comb.avg,
             'val_metrics': [m.avg for m in metrics]
         }
 
