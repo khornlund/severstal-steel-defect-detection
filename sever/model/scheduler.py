@@ -54,6 +54,8 @@ class CosineAnnealingScheduler(lr_scheduler._LRScheduler):
     def __init__(self, optimizer, start_anneal, n_epochs):
         self.curve = self.get_curve(1, start_anneal, n_epochs)
         self.initial_lrs = [param_group['lr'] for param_group in optimizer.param_groups]
+        print(f'INITIAL_LRS: {self.initial_lrs}')
+        super().__init__(optimizer)
 
     def get_curve(self, start_lr, start_anneal, n_epochs):
         # constant LR to start
@@ -69,8 +71,10 @@ class CosineAnnealingScheduler(lr_scheduler._LRScheduler):
         return lrs
 
     def get_lr(self):
-        for i, lr in enumerate(self.initial_lrs):
-            yield lr * self.curve[self.last_epoch - 1]
+        for i, init_lr in enumerate(self.initial_lrs):
+            lr = init_lr * self.curve[self._step_count - 1]
+            print(f'Yielding {lr}')
+            yield lr
 
 
 # -- Util functions --
