@@ -2,13 +2,7 @@ short_name: sever
 save_dir: saved/
 seed: 1234
 apex: 'O1'
-
-distributed:
-  master_addr: 127.0.0.1
-  master_port: 29500
-  n_nodes: 1
-  node_rank: 0
-  nproc_per_node: 2
+device: 0
 
 arch:
   type: Unet
@@ -22,7 +16,7 @@ arch:
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 16
+    batch_size: 8
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
@@ -48,7 +42,7 @@ metrics:
 optimizer:
   type: RAdam
   args:
-    lr: 0.002
+    lr: 0.001
     weight_decay: 0.0005
 
 training:

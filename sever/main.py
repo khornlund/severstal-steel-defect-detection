@@ -4,7 +4,6 @@ import random
 from apex import amp
 import numpy as np
 import torch
-from torch.nn.parallel import DataParallel as DP
 import segmentation_models_pytorch as module_arch
 
 import sever.data_loader.data_loaders as module_data
@@ -30,16 +29,16 @@ class Runner:
 
     def train(self, resume):
         config = self.config
+        device_id = config['device']
 
         self.logger.debug('Building model architecture')
         model = get_instance(module_arch, 'arch', config)
 
         device_ids = list(range(torch.cuda.device_count()))
-        self.logger.debug(f'Cuda devices: {device_ids}')
-        device = torch.device('cuda:0')
-
+        self.logger.debug(f'Using device {device_id} of {device_ids}')
+        device = torch.device(f'cuda:{device_id}')
+        torch.cuda.set_device(device)
         model = model.to(device)
-        self.logger.info(f'Using device {device}')
 
         self.logger.debug('Building optimizer and lr scheduler')
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
@@ -51,9 +50,6 @@ class Runner:
 
         lr_scheduler = get_instance(torch.optim.lr_scheduler, 'lr_scheduler',
                                     config, optimizer)
-
-        self.logger.info(f'Using `DataParallel`')
-        model = DP(model, device_ids=device_ids)
 
         model, optimizer = self._resume_checkpoint(resume, model, optimizer)
 
@@ -108,4 +104,3 @@ class Runner:
         amp.load_state_dict(checkpoint['amp'])
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer
-
