@@ -43,8 +43,12 @@ class Runner:
         torch.backends.cudnn.benchmark = True  # consistent input sizes
 
         self.logger.debug('Building optimizer and lr scheduler')
-        trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-        optimizer = get_instance(module_optimizer, 'optimizer', config, trainable_params)
+
+        params = [
+            {'params': model.encoder.parameters(), 'lr': config['optimizer']['lr_encoder']},
+            {'params': model.decoder.parameters(), 'lr': config['optimizer']['lr_decoder']}
+        ]
+        optimizer = get_instance(module_optimizer, 'optimizer', config, params)
         lr_scheduler = get_instance(module_scheduler, 'lr_scheduler', config, optimizer)
 
         model, optimizer = self._resume_checkpoint(resume, model, optimizer)

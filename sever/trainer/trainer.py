@@ -21,7 +21,6 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size)) * 16
-        self.grad_accum = config['training']['grad_accum']
         self.unfreeze_encoder = config['training']['unfreeze_encoder']
 
         self.logger.info('Freezing encoder weights')
@@ -52,7 +51,11 @@ class Trainer(BaseTrainer):
 
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
-        self.writer.add_scalar('LR', self._get_lr())
+        for i, param_group in enumerate(self.optimizer.param_groups):
+            if i == 0:
+                self.writer.add_scalar('LR/encoder', param_group['lr'])
+            elif i == 1:
+                self.writer.add_scalar('LR/decoder', param_group['lr'])
 
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
@@ -61,17 +64,12 @@ class Trainer(BaseTrainer):
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
-
+            self.optimizer.zero_grad()
             output = self.model(data)
             loss, bce, dice = self.loss(output, target)
 
-            if batch_idx == 0:
-                self.optimizer.zero_grad()
-            loss /= self.grad_accum
             loss.backward()
-            if batch_idx % self.grad_accum == 0 or batch_idx == len(self.data_loader) - 1:
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+            self.optimizer.step()
 
             losses_comb.update(loss.item(), data.size(0))
             losses_bce.update(bce.item(),   data.size(0))
@@ -91,19 +89,19 @@ class Trainer(BaseTrainer):
                 self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
                                 len(self.data_loader), loss.item())
 
+            if batch_idx == 0:
+                with torch.no_grad():
+                    target = torch.max(target, dim=1, keepdim=True)[0].cpu()
+                    output = torch.max(output, dim=1, keepdim=True)[0].cpu()
+                    self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
+                    self.writer.add_image('target', make_grid(target, nrow=2, normalize=True))
+                    self.writer.add_image('output', make_grid(output, nrow=2, normalize=True))
+
         self.writer.add_scalar('epoch/loss', losses_comb.avg)
         self.writer.add_scalar('epoch/bce',  losses_bce.avg)
         self.writer.add_scalar('epoch/dice', losses_dice.avg)
         for m in metrics:
             self.writer.add_scalar(f'epoch/{m.name}', m.avg)
-
-        if batch_idx == 0:
-            self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
-            for c in range(4):
-                self.writer.add_image(
-                    f'output_c{c}',
-                    make_grid(output[:, c, :, :].cpu(),
-                    nrow=2, normalize=True))
 
         del data
         del target
@@ -122,10 +120,6 @@ class Trainer(BaseTrainer):
             self.lr_scheduler.step()
 
         return log
-
-    def _get_lr(self):
-        for param_group in self.optimizer.param_groups:
-            return param_group['lr']
 
     def _log_batch(self, epoch, batch_idx, batch_size, len_data, loss):
         n_samples = batch_size * len_data

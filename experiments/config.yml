@@ -1,7 +1,6 @@
-short_name: sever
+short_name: sever-cuda:0
 save_dir: saved/
 seed: 1234
-apex: 'O1'
 device: 0
 
 arch:
@@ -12,26 +11,27 @@ arch:
     classes: 4
     in_channels: 1
     activation: null
-    dropout: 0.1
+    dropout: 0.10
+    decoder_use_batchnorm: true
 
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 8
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
     validation_split: 0.2
 
-augmentation: LightTransforms
+augmentation: RandomCropTransforms
 
 loss: CombinedBCEDice
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 4
-    n_epochs: 30
+    start_anneal: 1
+    n_epochs: 31
 
 metrics:
   - dice_0
@@ -42,6 +42,8 @@ metrics:
 
 optimizer:
   type: RAdam
+  lr_encoder: 0.00001
+  lr_decoder: 0.001
   args:
     lr: 0.001
     weight_decay: 0.0005
@@ -49,6 +51,7 @@ optimizer:
 training:
   early_stop: 10
   epochs: 30
+  unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1
   tensorboard: true

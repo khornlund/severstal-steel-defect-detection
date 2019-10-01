@@ -1,9 +1,18 @@
 import abc
 from copy import deepcopy
 
-from albumentations import (HorizontalFlip, VerticalFlip, Normalize, Compose, RandomContrast,
-                            RandomBrightness, RandomSizedCrop, Cutout)
 from albumentations.torch import ToTensor
+from albumentations import (
+    HorizontalFlip,
+    VerticalFlip,
+    Normalize,
+    Compose,
+    RandomContrast,
+    RandomBrightness,
+    RandomSizedCrop,
+    Cutout,
+    RandomCrop,
+)
 
 
 class AugmentationBase(abc.ABC):
@@ -86,5 +95,27 @@ class HeavyTransforms(AugmentationBase):
             RandomBrightness(p=0.2),
             RandomSizedCrop((240, 256), self.H, self.W, w2h_ratio=1600 / 256),
             Cutout(max_h_size=32, max_w_size=32),
+            ToTensor(),
+        ])
+
+
+class RandomCropTransforms(AugmentationBase):
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
+        return Compose([
+            RandomCrop(self.H, self.H * 2),
+            HorizontalFlip(p=0.5),
+            VerticalFlip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+    def build_test(self):
+        return Compose([
+            RandomCrop(self.H, self.H * 2),
+            Normalize(mean=self.MEAN, std=self.STD),
             ToTensor(),
         ])
