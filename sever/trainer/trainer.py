@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from apex import amp
 from torchvision.utils import make_grid
 
 from sever.base import BaseTrainer
@@ -21,7 +20,7 @@ class Trainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size)) * 4
+        self.log_step = int(np.sqrt(data_loader.batch_size)) * 16
         self.grad_accum = config['training']['grad_accum']
         self.unfreeze_encoder = config['training']['unfreeze_encoder']
 
@@ -62,19 +61,17 @@ class Trainer(BaseTrainer):
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
+
             output = self.model(data)
             loss, bce, dice = self.loss(output, target)
 
-            accum_loss = loss / self.grad_accum
-
+            if batch_idx == 0:
+                self.optimizer.zero_grad()
+            loss /= self.grad_accum
+            loss.backward()
             if batch_idx % self.grad_accum == 0 or batch_idx == len(self.data_loader) - 1:
-                with amp.scale_loss(accum_loss, self.optimizer) as scaled_loss:
-                    scaled_loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-            else:
-                with amp.scale_loss(accum_loss, self.optimizer, delay_unscale=True) as scaled_loss:
-                    scaled_loss.backward()
 
             losses_comb.update(loss.item(), data.size(0))
             losses_bce.update(bce.item(),   data.size(0))
@@ -100,8 +97,17 @@ class Trainer(BaseTrainer):
         for m in metrics:
             self.writer.add_scalar(f'epoch/{m.name}', m.avg)
 
-        if batch_idx == 1:
+        if batch_idx == 0:
             self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
+            for c in range(4):
+                self.writer.add_image(
+                    f'output_c{c}',
+                    make_grid(output[:, c, :, :].cpu(),
+                    nrow=2, normalize=True))
+
+        del data
+        del target
+        del output
 
         log = {
             'loss': losses_comb.avg,

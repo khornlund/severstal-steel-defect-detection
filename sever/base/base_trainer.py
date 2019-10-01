@@ -4,7 +4,6 @@ import shutil
 
 import yaml
 import torch
-from apex import amp
 
 from sever.utils import setup_logger, trainer_paths, TensorboardWriter
 
@@ -130,7 +129,6 @@ class BaseTrainer:
             'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.mnt_best,
             'config': self.config,
-            'amp': amp.state_dict()
         }
         filename = os.path.join(self.checkpoint_dir, f'checkpoint-epoch{epoch}.pth')
         torch.save(state, filename)

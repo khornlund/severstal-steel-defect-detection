@@ -1,7 +1,6 @@
 import os
 import random
 
-from apex import amp
 import numpy as np
 import torch
 import segmentation_models_pytorch as module_arch
@@ -41,14 +40,11 @@ class Runner:
         torch.cuda.set_device(device)
         model = model.to(device)
 
+        torch.backends.cudnn.benchmark = True  # consistent input sizes
+
         self.logger.debug('Building optimizer and lr scheduler')
         trainable_params = filter(lambda p: p.requires_grad, model.parameters())
         optimizer = get_instance(module_optimizer, 'optimizer', config, trainable_params)
-
-        opt_level = config['apex']
-        self.logger.debug(f'Setting apex opt_level: {opt_level}')
-        model, optimizer = amp.initialize(model, optimizer, opt_level=opt_level)
-
         lr_scheduler = get_instance(module_scheduler, 'lr_scheduler', config, optimizer)
 
         model, optimizer = self._resume_checkpoint(resume, model, optimizer)
@@ -101,6 +97,5 @@ class Runner:
         else:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
-        amp.load_state_dict(checkpoint['amp'])
         self.logger.info(f'Checkpoint "{resume_path}" loaded')
         return model, optimizer
