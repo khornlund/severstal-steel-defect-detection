@@ -66,8 +66,8 @@ class MediumTransforms(AugmentationBase):
             HorizontalFlip(p=0.5),
             VerticalFlip(p=0.5),
             Normalize(mean=self.MEAN, std=self.STD),
-            RandomContrast(p=0.2),
-            RandomBrightness(p=0.2),
+            RandomContrast(p=0.1),
+            RandomBrightness(p=0.1),
             ToTensor(),
         ])
 

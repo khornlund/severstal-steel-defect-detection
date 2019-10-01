@@ -22,6 +22,12 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size)) * 4
+        self.grad_accum = config['training']['grad_accum']
+        self.unfreeze_encoder = config['training']['unfreeze_encoder']
+
+        self.logger.info('Freezing encoder weights')
+        for p in self.model.encoder.parameters():
+            p.requires_grad = False
 
     def _train_epoch(self, epoch):
         """
@@ -39,6 +45,12 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
+        if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
+            self.logger.info('Unfreezing encoder weights')
+            for p in self.model.encoder.parameters():
+                p.requires_grad = True
+            self.unfreeze_encoder = None
+
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
         self.writer.add_scalar('LR', self._get_lr())
@@ -50,12 +62,19 @@ class Trainer(BaseTrainer):
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
-            self.optimizer.zero_grad()
             output = self.model(data)
             loss, bce, dice = self.loss(output, target)
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
-            self.optimizer.step()
+
+            accum_loss = loss / self.grad_accum
+
+            if batch_idx % self.grad_accum == 0 or batch_idx == len(self.data_loader) - 1:
+                with amp.scale_loss(accum_loss, self.optimizer) as scaled_loss:
+                    scaled_loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+            else:
+                with amp.scale_loss(accum_loss, self.optimizer, delay_unscale=True) as scaled_loss:
+                    scaled_loss.backward()
 
             losses_comb.update(loss.item(), data.size(0))
             losses_bce.update(bce.item(),   data.size(0))
@@ -75,14 +94,14 @@ class Trainer(BaseTrainer):
                 self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
                                 len(self.data_loader), loss.item())
 
-            self.writer.add_scalar('epoch/loss', losses_comb.avg)
-            self.writer.add_scalar('epoch/bce',  losses_bce.avg)
-            self.writer.add_scalar('epoch/dice', losses_dice.avg)
-            for m in metrics:
-                self.writer.add_scalar(f'epoch/{m.name}', m.avg)
+        self.writer.add_scalar('epoch/loss', losses_comb.avg)
+        self.writer.add_scalar('epoch/bce',  losses_bce.avg)
+        self.writer.add_scalar('epoch/dice', losses_dice.avg)
+        for m in metrics:
+            self.writer.add_scalar(f'epoch/{m.name}', m.avg)
 
-            if batch_idx == 1:
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
+        if batch_idx == 1:
+            self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
 
         log = {
             'loss': losses_comb.avg,
