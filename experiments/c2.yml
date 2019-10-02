@@ -23,15 +23,19 @@ data_loader:
     shuffle: true
     validation_split: 0.2
 
-augmentation: RandomCropTransforms
+augmentation: RandomCropMediumTransforms
 
-loss: BCEDiceLoss
+loss:
+  type: SmoothBCEDiceLoss
+  args:
+    bce_weight: 0.6
+    dice_weight: 0.4
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 1
-    n_epochs: 100
+    start_anneal: 50
+    n_epochs: 251
 
 metrics:
   - dice_0
@@ -42,15 +46,15 @@ metrics:
 
 optimizer:
   type: RAdam
-  lr_encoder: 0.00001
-  lr_decoder: 0.001
+  lr_encoder: 0.00003
+  lr_decoder: 0.003
   args:
     lr: 0.001
     weight_decay: 0.0005
 
 training:
-  early_stop: 30
-  epochs: 99
+  early_stop: 50
+  epochs: 250
   unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1
@@ -62,3 +66,8 @@ testing:
   batch_size: 128
   nworkers: 8
   verbose: 2
+
+
+# more epochs
+# decay LR later
+# weight BCE heavier than Dice

@@ -5,6 +5,7 @@ from albumentations.torch import ToTensor
 from albumentations import (
     HorizontalFlip,
     VerticalFlip,
+    Flip,
     Normalize,
     Compose,
     RandomContrast,
@@ -12,6 +13,7 @@ from albumentations import (
     RandomSizedCrop,
     Cutout,
     RandomCrop,
+    RandomRotate90
 )
 
 
@@ -108,6 +110,21 @@ class RandomCropTransforms(AugmentationBase):
         return Compose([
             RandomCrop(self.H, self.H),
             HorizontalFlip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+
+class RandomCropMediumTransforms(AugmentationBase):
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
+        return Compose([
+            RandomCrop(self.H, self.H),
+            Flip(p=0.5),
+            RandomRotate90(p=0.5),
             Normalize(mean=self.MEAN, std=self.STD),
             ToTensor(),
         ])

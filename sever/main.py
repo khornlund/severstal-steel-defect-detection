@@ -62,7 +62,7 @@ class Runner:
         valid_data_loader = data_loader.split_validation()
 
         self.logger.debug('Getting loss and metric function handles')
-        loss = getattr(module_loss, config['loss'])()
+        loss = get_instance(module_loss, 'loss', config)
         metrics = [getattr(module_metric, met) for met in config['metrics']]
 
         self.logger.debug('Initialising trainer')
