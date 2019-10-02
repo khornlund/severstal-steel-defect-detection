@@ -1,7 +1,13 @@
 import math
 import torch
+from torch import optim
 from torch.optim.optimizer import Optimizer
 from apex.optimizers import FusedAdam
+
+
+class Adam(optim.Adam):
+
+    pass
 
 
 class RAdam(Optimizer):

@@ -66,6 +66,8 @@ class Trainer(BaseTrainer):
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
+            # self.logger.info(f'output: {output.size()}')
+            # self.logger.info(f'target: {target.size()}')
             loss, bce, dice = self.loss(output, target)
 
             loss.backward()
@@ -91,11 +93,14 @@ class Trainer(BaseTrainer):
 
             if batch_idx == 0:
                 with torch.no_grad():
+                    data = data.cpu()
                     target = torch.max(target, dim=1, keepdim=True)[0].cpu()
                     output = torch.max(output, dim=1, keepdim=True)[0].cpu()
-                    self.writer.add_image('input', make_grid(data.cpu(), nrow=2, normalize=True))
-                    self.writer.add_image('target', make_grid(target, nrow=2, normalize=True))
-                    self.writer.add_image('output', make_grid(output, nrow=2, normalize=True))
+
+                    truth = torch.cat([data, target, target], dim=1)
+                    preds = torch.cat([data, output, output], dim=1)
+                    self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
+                    self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
 
         self.writer.add_scalar('epoch/loss', losses_comb.avg)
         self.writer.add_scalar('epoch/bce',  losses_bce.avg)

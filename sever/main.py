@@ -9,6 +9,7 @@ import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
+# import torch.optim as module_optimizer
 import sever.model.scheduler as module_scheduler
 import sever.data_loader.augmentation as module_aug
 from sever.trainer import Trainer

@@ -106,16 +106,8 @@ class RandomCropTransforms(AugmentationBase):
 
     def build_train(self):
         return Compose([
-            RandomCrop(self.H, self.H * 2),
+            RandomCrop(self.H, self.H),
             HorizontalFlip(p=0.5),
-            VerticalFlip(p=0.5),
-            Normalize(mean=self.MEAN, std=self.STD),
-            ToTensor(),
-        ])
-
-    def build_test(self):
-        return Compose([
-            RandomCrop(self.H, self.H * 2),
             Normalize(mean=self.MEAN, std=self.STD),
             ToTensor(),
         ])
