@@ -103,10 +103,10 @@ class BCEDiceLoss(nn.Module):
         if self.dice_weight == 0:
             return self.bce_weight * self.bce_loss(outputs, targets)
 
-        bce = self.bce_weight * self.bce_loss(outputs, targets)
-        dice = self.dice_weight * self.dice_loss(outputs, targets)
+        bce = self.bce_loss(outputs, targets)
+        dice = self.dice_loss(outputs, targets)
 
-        return bce + dice, bce, dice
+        return (self.bce_weight * bce + self.dice_weight * dice), bce, dice
 
 
 class SmoothBCELoss(nn.Module):

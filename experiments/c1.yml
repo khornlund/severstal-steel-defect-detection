@@ -25,12 +25,16 @@ data_loader:
 
 augmentation: RandomCropMediumTransforms
 
-loss: SmoothBCEDiceLoss
+loss:
+  type: SmoothBCEDiceLoss
+  args:
+    bce_weight: 0.7
+    dice_weight: 0.3
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 50
+    start_anneal: 100
     n_epochs: 251
 
 metrics:
@@ -67,3 +71,4 @@ testing:
 # More epochs
 # Increase LR
 # LR scheduler flat for longer
+# weight bce > dice
