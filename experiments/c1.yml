@@ -28,14 +28,14 @@ augmentation: RandomCropMediumTransforms
 loss:
   type: SmoothBCEDiceLoss
   args:
-    bce_weight: 0.7
-    dice_weight: 0.3
+    bce_weight: 0.8
+    dice_weight: 0.2
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 100
-    n_epochs: 251
+    start_anneal: 90
+    n_epochs: 351
 
 metrics:
   - dice_0
@@ -46,7 +46,7 @@ metrics:
 
 optimizer:
   type: RAdam
-  lr_encoder: 0.00005
+  lr_encoder: 0.0001
   lr_decoder: 0.005
   args:
     lr: 0.001
@@ -54,7 +54,7 @@ optimizer:
 
 training:
   early_stop: 50
-  epochs: 250
+  epochs: 350
   unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1
@@ -66,9 +66,3 @@ testing:
   batch_size: 128
   nworkers: 8
   verbose: 2
-
-
-# More epochs
-# Increase LR
-# LR scheduler flat for longer
-# weight bce > dice

@@ -1,7 +1,7 @@
 import abc
 from copy import deepcopy
 
-from albumentations.torch import ToTensor
+from albumentations.pytorch import ToTensor
 from albumentations import (
     HorizontalFlip,
     VerticalFlip,
@@ -13,7 +13,8 @@ from albumentations import (
     RandomSizedCrop,
     Cutout,
     RandomCrop,
-    RandomRotate90
+    RandomRotate90,
+    CropNonEmptyMaskIfExists
 )
 
 
@@ -123,6 +124,21 @@ class RandomCropMediumTransforms(AugmentationBase):
     def build_train(self):
         return Compose([
             RandomCrop(self.H, self.H),
+            Flip(p=0.5),
+            RandomRotate90(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+
+class MaskCropTransforms(AugmentationBase):
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
+        return Compose([
+            CropNonEmptyMaskIfExists(self.H, self.H),
             Flip(p=0.5),
             RandomRotate90(p=0.5),
             Normalize(mean=self.MEAN, std=self.STD),
