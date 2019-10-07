@@ -3,13 +3,14 @@ import random
 
 import numpy as np
 import torch
-import segmentation_models_pytorch as module_arch
+# import segmentation_models_pytorch as module_arch
+
 
 import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
-# import torch.optim as module_optimizer
+import sever.model.model as module_arch
 import sever.model.scheduler as module_scheduler
 import sever.data_loader.augmentation as module_aug
 from sever.trainer import Trainer
@@ -45,10 +46,11 @@ class Runner:
 
         self.logger.debug('Building optimizer and lr scheduler')
 
-        params = [
-            {'params': model.encoder.parameters(), 'lr': config['optimizer']['lr_encoder']},
-            {'params': model.decoder.parameters(), 'lr': config['optimizer']['lr_decoder']}
-        ]
+        # params = [
+        #     {'params': model.encoder.parameters(), 'lr': config['optimizer']['lr_encoder']},
+        #     {'params': model.decoder.parameters(), 'lr': config['optimizer']['lr_decoder']}
+        # ]
+        params = model.parameters()
         optimizer = get_instance(module_optimizer, 'optimizer', config, params)
         lr_scheduler = get_instance(module_scheduler, 'lr_scheduler', config, optimizer)
 

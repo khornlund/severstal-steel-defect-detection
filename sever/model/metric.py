@@ -39,3 +39,24 @@ def dice_single_channel(probability, truth, threshold, eps=1e-9):
     t = (truth.view(-1) > 0.5).float()
     dice = (2.0 * (p * t).sum() + eps) / (p.sum() + t.sum() + eps)
     return dice
+
+
+def accuracy_c0(output, targets, threshold=0.5):
+    return accuracy(output, targets, 0)
+
+
+def accuracy_c1(output, targets, threshold=0.5):
+    return accuracy(output, targets, 1)
+
+
+def accuracy_c2(output, targets, threshold=0.5):
+    return accuracy(output, targets, 2)
+
+
+def accuracy_c3(output, targets, threshold=0.5):
+    return accuracy(output, targets, 3)
+
+
+def accuracy(output, targets, class_, threshold=0.5):
+    preds = (output[:, class_] > threshold).float()
+    return (preds == targets[:, class_]).float().mean()

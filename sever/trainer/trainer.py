@@ -23,9 +23,9 @@ class Trainer(BaseTrainer):
         self.log_step = int(np.sqrt(data_loader.batch_size)) * 16
         self.unfreeze_encoder = config['training']['unfreeze_encoder']
 
-        self.logger.info('Freezing encoder weights')
-        for p in self.model.encoder.parameters():
-            p.requires_grad = False
+        # self.logger.info('Freezing encoder weights')
+        # for p in self.model.encoder.parameters():
+        #     p.requires_grad = False
 
     def _train_epoch(self, epoch):
         """
@@ -43,11 +43,11 @@ class Trainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
-        if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
-            self.logger.info('Unfreezing encoder weights')
-            for p in self.model.encoder.parameters():
-                p.requires_grad = True
-            self.unfreeze_encoder = None
+        # if self.unfreeze_encoder is not None and epoch >= self.unfreeze_encoder:
+        #     self.logger.info('Unfreezing encoder weights')
+        #     for p in self.model.encoder.parameters():
+        #         p.requires_grad = True
+        #     self.unfreeze_encoder = None
 
         self.model.train()
         self.writer.set_step((epoch) * len(self.data_loader))
@@ -68,21 +68,22 @@ class Trainer(BaseTrainer):
             output = self.model(data)
             # self.logger.info(f'output: {output.size()}')
             # self.logger.info(f'target: {target.size()}')
-            loss, bce, dice = self.loss(output, target)
+            # loss, bce, dice = self.loss(output, target)
+            loss = self.loss(output, target)
 
             loss.backward()
             self.optimizer.step()
 
             losses_comb.update(loss.item(), data.size(0))
-            losses_bce.update(bce.item(),   data.size(0))
-            losses_dice.update(dice.item(), data.size(0))
+            # losses_bce.update(bce.item(),   data.size(0))
+            # losses_dice.update(dice.item(), data.size(0))
 
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch) * len(self.data_loader) + batch_idx)
 
                 self.writer.add_scalar('batch/loss', loss.item())
-                self.writer.add_scalar('batch/bce',  bce.item())
-                self.writer.add_scalar('batch/dice', dice.item())
+                # self.writer.add_scalar('batch/bce',  bce.item())
+                # self.writer.add_scalar('batch/dice', dice.item())
 
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
@@ -91,20 +92,20 @@ class Trainer(BaseTrainer):
                 self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
                                 len(self.data_loader), loss.item())
 
-            if batch_idx == 0:
-                with torch.no_grad():
-                    data = data.cpu()
-                    target = torch.max(target, dim=1, keepdim=True)[0].cpu()
-                    output = torch.max(output, dim=1, keepdim=True)[0].cpu()
+            # if batch_idx == 0:
+            #     with torch.no_grad():
+            #         data = data.cpu()
+            #         target = torch.max(target, dim=1, keepdim=True)[0].cpu()
+            #         output = torch.max(output, dim=1, keepdim=True)[0].cpu()
 
-                    truth = torch.cat([data, target, target], dim=1)
-                    preds = torch.cat([data, output, output], dim=1)
-                    self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
-                    self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
+            #         truth = torch.cat([data, target, target], dim=1)
+            #         preds = torch.cat([data, output, output], dim=1)
+            #         self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
+            #         self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
 
         self.writer.add_scalar('epoch/loss', losses_comb.avg)
-        self.writer.add_scalar('epoch/bce',  losses_bce.avg)
-        self.writer.add_scalar('epoch/dice', losses_dice.avg)
+        # self.writer.add_scalar('epoch/bce',  losses_bce.avg)
+        # self.writer.add_scalar('epoch/dice', losses_dice.avg)
         for m in metrics:
             self.writer.add_scalar(f'epoch/{m.name}', m.avg)
 
@@ -152,19 +153,20 @@ class Trainer(BaseTrainer):
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
-                loss, bce, dice = self.loss(output, target)
+                # loss, bce, dice = self.loss(output, target)
+                loss = self.loss(output, target)
 
                 losses_comb.update(loss.item(), data.size(0))
-                losses_bce.update(bce.item(),   data.size(0))
-                losses_dice.update(dice.item(), data.size(0))
+                # losses_bce.update(bce.item(),   data.size(0))
+                # losses_dice.update(dice.item(), data.size(0))
 
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
 
         self.writer.set_step((epoch), 'valid')
         self.writer.add_scalar('loss', losses_comb.avg)
-        self.writer.add_scalar('bce', losses_bce.avg)
-        self.writer.add_scalar('dice', losses_dice.avg)
+        # self.writer.add_scalar('bce', losses_bce.avg)
+        # self.writer.add_scalar('dice', losses_dice.avg)
         for m in metrics:
             self.writer.add_scalar(m.name, m.avg)
 

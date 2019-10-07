@@ -1,0 +1,61 @@
+short_name: sever-cuda:0
+save_dir: saved/
+seed: 1234
+device: 0
+
+arch:
+  type: EffNet
+  args:
+    model: b0
+    num_classes: 4
+    pretrained: true
+    verbose: 0
+
+data_loader:
+  type: SteelClasDataLoader
+  args:
+    batch_size: 8
+    data_dir: data/raw/severstal-steel-defect-detection
+    nworkers: 4
+    shuffle: true
+    validation_split: 0.2
+
+augmentation: LightTransforms
+
+loss:
+  type: SmoothBCELoss
+  args:
+    eps: 0.0000001
+
+lr_scheduler:
+  type: CosineAnnealingScheduler
+  args:
+    start_anneal: 10
+    n_epochs: 51
+
+metrics:
+  - accuracy_c0
+  - accuracy_c1
+  - accuracy_c2
+  - accuracy_c3
+
+optimizer:
+  type: RAdam
+  args:
+    lr: 0.001
+    weight_decay: 0.0005
+
+training:
+  early_stop: 30
+  epochs: 50
+  unfreeze_encoder: 0
+  monitor: min val_loss
+  save_period: 1
+  tensorboard: true
+  verbose: 2
+
+testing:
+  data_dir: data/
+  batch_size: 128
+  nworkers: 8
+  verbose: 2
