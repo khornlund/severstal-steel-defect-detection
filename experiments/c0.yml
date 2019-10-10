@@ -1,23 +1,24 @@
-short_name: sever-cuda:1
+short_name: sever-cuda:0
 save_dir: saved/
 seed: 1234
-device: 1
+device: 0
 
 arch:
-  type: Unet
+  type: FPN
   args:
-    encoder_name: efficientnet-b0
+    encoder_name: efficientnet-b5
     encoder_weights: imagenet
     classes: 4
     in_channels: 1
     activation: null
     dropout: 0.1
-    decoder_use_batchnorm: true
+    weight_std: true
+    decoder_merge_policy: cat
 
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 32
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true

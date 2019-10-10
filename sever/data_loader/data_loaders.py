@@ -49,5 +49,5 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTrainVal(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
-            return DataLoader(dataset, self.batch_size,
+            return DataLoader(dataset, self.batch_size // 2,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)
