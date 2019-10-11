@@ -29,34 +29,6 @@ class SoftDiceLoss(nn.Module):
         return score
 
 
-def dice(
-    outputs: torch.Tensor,
-    targets: torch.Tensor,
-    eps: float = 1e-7,
-    threshold: float = None
-):
-    """
-    Computes the dice metric
-    Args:
-        outputs (list):  A list of predicted elements
-        targets (list): A list of elements that are to be predicted
-        eps (float): epsilon
-        threshold (float): threshold for outputs binarization
-    Returns:
-        double:  Dice score
-    """
-    outputs = F.sigmoid(outputs)
-
-    if threshold is not None:
-        outputs = (outputs > threshold).float()
-
-    intersection = torch.sum(targets * outputs)
-    union = torch.sum(targets) + torch.sum(outputs)
-    dice = 2 * intersection / (union + eps)
-
-    return dice
-
-
 class DiceLoss(nn.Module):
     def __init__(self, eps: float = 1e-7, threshold: float = None):
         super().__init__()
@@ -136,6 +108,57 @@ class SmoothBCEDiceLoss(BCEDiceLoss):
         self.bce_loss = SmoothBCELoss(eps)
 
 
+class IoULoss(nn.Module):
+    """
+    Intersection over union (Jaccard) loss
+    Args:
+        eps (float): epsilon to avoid zero division
+        threshold (float): threshold for outputs binarization
+        activation (str): An torch.nn activation applied to the outputs.
+            Must be one of ['none', 'Sigmoid', 'Softmax2d']
+    """
+
+    def __init__(
+        self,
+        eps: float = 1e-7,
+        threshold: float = None
+    ):
+        super().__init__()
+        self.metric_fn = partial(iou, eps=eps, threshold=threshold)
+
+    def forward(self, outputs, targets):
+        iou = self.metric_fn(outputs, targets)
+        return 1 - iou
+
+
+class SmoothBCEDiceIoULoss(nn.Module):
+    def __init__(
+            self,
+            eps: float = 1e-7,
+            smooth: float = 1e-6,
+            bce_weight: float = 1,
+            dice_weight: float = 1,
+            iou_weight: float = 1
+    ):
+        super().__init__()
+        self.bce_weight = bce_weight
+        self.dice_weight = dice_weight
+        self.iou_weight = iou_weight
+
+        self.bce_loss = SmoothBCELoss(eps=smooth)
+        self.dice_loss = DiceLoss(eps=eps)
+        self.iou_loss = IoULoss(eps=eps)
+
+    def forward(self, outputs, targets):
+        bce = self.bce_loss(outputs, targets)
+        dice = self.dice_loss(outputs, targets)
+        iou = self.iou_loss(outputs, targets)
+
+        total = self.bce_weight * bce + self.dice_weight * dice + self.iou_weight * iou
+
+        return total, bce, dice, iou
+
+
 # -- utils ----------------------------------------------------------------------------------------
 
 class LabelSmoother:
@@ -149,3 +172,62 @@ class LabelSmoother:
 
     def __call__(self, t):
         return (t + self.bias) * self.scale
+
+
+def iou(
+    outputs: torch.Tensor,
+    targets: torch.Tensor,
+    eps: float = 1e-7,
+    threshold: float = None,
+    activation: str = "Sigmoid"
+):
+    """
+    https://github.com/catalyst-team/catalyst/blob/master/catalyst/dl/utils/criterion/iou.py
+    Args:
+        outputs (torch.Tensor): A list of predicted elements
+        targets (torch.Tensor):  A list of elements that are to be predicted
+        eps (float): epsilon to avoid zero division
+        threshold (float): threshold for outputs binarization
+        activation (str): An torch.nn activation applied to the outputs.
+            Must be one of ["none", "Sigmoid", "Softmax2d"]
+    Returns:
+        float: IoU (Jaccard) score
+    """
+    outputs = F.sigmoid(outputs)
+
+    if threshold is not None:
+        outputs = (outputs > threshold).float()
+
+    intersection = torch.sum(targets * outputs)
+    union = torch.sum(targets) + torch.sum(outputs)
+    iou = intersection / (union - intersection + eps)
+
+    return iou
+
+
+def dice(
+    outputs: torch.Tensor,
+    targets: torch.Tensor,
+    eps: float = 1e-7,
+    threshold: float = None
+):
+    """
+    Computes the dice metric
+    Args:
+        outputs (list):  A list of predicted elements
+        targets (list): A list of elements that are to be predicted
+        eps (float): epsilon
+        threshold (float): threshold for outputs binarization
+    Returns:
+        double:  Dice score
+    """
+    outputs = F.sigmoid(outputs)
+
+    if threshold is not None:
+        outputs = (outputs > threshold).float()
+
+    intersection = torch.sum(targets * outputs)
+    union = torch.sum(targets) + torch.sum(outputs)
+    dice = 2 * intersection / (union + eps)
+
+    return dice

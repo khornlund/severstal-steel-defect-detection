@@ -45,10 +45,7 @@ class Runner:
 
         self.logger.debug('Building optimizer and lr scheduler')
 
-        params = [
-            {'params': model.encoder.parameters(), 'lr': config['optimizer']['lr_encoder']},
-            {'params': model.decoder.parameters(), 'lr': config['optimizer']['lr_decoder']}
-        ]
+        params = self._setup_param_groups(model, config)
         optimizer = get_instance(module_optimizer, 'optimizer', config, params)
         lr_scheduler = get_instance(module_scheduler, 'lr_scheduler', config, optimizer)
 
@@ -75,6 +72,44 @@ class Runner:
 
         trainer.train()
         self.logger.debug('Finished!')
+
+    def _setup_param_groups(self, model, config):
+        encoder_opts = config['optimizer']['encoder']
+        decoder_opts = config['optimizer']['decoder']
+
+        encoder_weight_params = []
+        encoder_bias_params = []
+        decoder_weight_params = []
+        decoder_bias_params = []
+
+        for name, param in model.encoder.named_parameters():
+            if name.endswith('bias'):
+                encoder_bias_params.append(param)
+            else:
+                encoder_weight_params.append(param)
+
+        for name, param in model.decoder.named_parameters():
+            if name.endswith('bias'):
+                decoder_bias_params.append(param)
+            else:
+                decoder_weight_params.append(param)
+
+        self.logger.info(f'Found {len(encoder_weight_params)} encoder weight params')
+        self.logger.info(f'Found {len(encoder_bias_params)} encoder bias params')
+        self.logger.info(f'Found {len(decoder_weight_params)} decoder weight params')
+        self.logger.info(f'Found {len(decoder_bias_params)} decoder bias params')
+
+        params = [
+            {'params': encoder_weight_params, **encoder_opts},
+            {'params': decoder_weight_params, **decoder_opts},
+            {'params': encoder_bias_params,
+             'lr': encoder_opts['lr'],
+             'weight_decay': encoder_opts['weight_decay']},
+            {'params': decoder_bias_params,
+             'lr': decoder_opts['lr'],
+             'weight_decay': decoder_opts['weight_decay']},
+        ]
+        return params
 
     def _seed_everything(self, seed):
         self.logger.info(f'Using random seed: {seed}')

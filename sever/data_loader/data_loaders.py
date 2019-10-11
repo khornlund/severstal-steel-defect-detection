@@ -1,10 +1,12 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
 from .datasets import SteelDatasetTrainVal, SteelDatasetTest
+from .sampling import SamplerFactory
 
 
 class SteelDataLoader(DataLoader):
@@ -13,10 +15,10 @@ class SteelDataLoader(DataLoader):
     test_csv  = 'sample_submission.csv'
 
     def __init__(self, transforms, data_dir, batch_size, shuffle,
-                 validation_split, nworkers, pin_memory=True, train=True
+                 validation_split, nworkers, pin_memory=True, train=True, alpha=None, balance=None
     ):  # noqa
         self.transforms, self.shuffle = transforms, shuffle
-        self.batch_size, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
+        self.bs, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
         self.data_dir = Path(data_dir)
 
         self.train_df, self.val_df = self.load_df(train, validation_split)
@@ -26,8 +28,15 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTest(self.df, self.data_dir, transforms.copy())
 
-        super().__init__(dataset, batch_size, shuffle=shuffle,
-                         num_workers=nworkers, pin_memory=pin_memory)
+        if train and balance is not None and alpha is not None:
+            class_idxs = self.sort_classes(self.train_df)
+            n_batches = self.train_df.shape[0] // batch_size
+            sampler = SamplerFactory(2).get(class_idxs, batch_size, n_batches, alpha, balance)
+            super().__init__(dataset, batch_sampler=sampler,
+                            num_workers=nworkers, pin_memory=pin_memory)
+        else:
+            super().__init__(dataset, batch_size, shuffle=shuffle,
+                            num_workers=nworkers, pin_memory=pin_memory)
 
     def load_df(self, train, validation_split):
         csv_filename = self.train_csv if train else self.test_csv
@@ -38,10 +47,29 @@ class SteelDataLoader(DataLoader):
         df.columns = [f'rle{c}' for c in range(4)]
         df['defects'] = df.count(axis=1)
 
+        # add classification columns
+        for c in range(4):
+            df[f'c{c}'] = df[f'rle{c}'].apply(lambda rle: not pd.isnull(rle))
+
         if train and validation_split > 0:
             return train_test_split(df, test_size=validation_split, stratify=df["defects"])
 
         return df, pd.DataFrame({})
+
+    def sort_classes(self, df):
+        counts = {c: df[f'c{c}'].sum() for c in range(4)}
+        sorted_classes = sorted(counts.items(), key=lambda kv: kv[1])
+
+        def assign_min_sample_class(row, sorted_classes):
+            for c, _ in sorted_classes:
+                if row[f'c{c}']:
+                    return c
+            return -1
+
+        df['sample_class'] = df.apply(
+            lambda row: assign_min_sample_class(row, sorted_classes), axis=1)
+        class_idxs = [list(np.where(df['sample_class'] == c)[0]) for c in range(-1, 4)]
+        return class_idxs
 
     def split_validation(self):
         if self.val_df.empty:
@@ -49,5 +77,5 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTrainVal(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
-            return DataLoader(dataset, self.batch_size // 2,
+            return DataLoader(dataset, self.bs // 2,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)

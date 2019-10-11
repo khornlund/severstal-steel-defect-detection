@@ -20,7 +20,7 @@ class Trainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size)) * 16
+        self.log_step = int(np.sqrt(data_loader.bs)) * 8
         self.unfreeze_encoder = config['training']['unfreeze_encoder']
 
         self.logger.info('Freezing encoder weights')
@@ -60,6 +60,7 @@ class Trainer(BaseTrainer):
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
+        losses_iou = AverageMeter('loss_iou')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
@@ -68,7 +69,7 @@ class Trainer(BaseTrainer):
             output = self.model(data)
             # self.logger.info(f'output: {output.size()}')
             # self.logger.info(f'target: {target.size()}')
-            loss, bce, dice = self.loss(output, target)
+            loss, bce, dice, iou = self.loss(output, target)
 
             loss.backward()
             self.optimizer.step()
@@ -76,6 +77,7 @@ class Trainer(BaseTrainer):
             losses_comb.update(loss.item(), data.size(0))
             losses_bce.update(bce.item(),   data.size(0))
             losses_dice.update(dice.item(), data.size(0))
+            losses_iou.update(iou.item(), data.size(0))
 
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch) * len(self.data_loader) + batch_idx)
@@ -83,12 +85,13 @@ class Trainer(BaseTrainer):
                 self.writer.add_scalar('batch/loss', loss.item())
                 self.writer.add_scalar('batch/bce',  bce.item())
                 self.writer.add_scalar('batch/dice', dice.item())
+                self.writer.add_scalar('batch/iou', iou.item())
 
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
                     self.writer.add_scalar(f'batch/{metrics[i].name}', value)
 
-                self._log_batch(epoch, batch_idx, self.data_loader.batch_size,
+                self._log_batch(epoch, batch_idx, self.data_loader.bs,
                                 len(self.data_loader), loss.item())
 
             if batch_idx == 0:
@@ -105,6 +108,7 @@ class Trainer(BaseTrainer):
         self.writer.add_scalar('epoch/loss', losses_comb.avg)
         self.writer.add_scalar('epoch/bce',  losses_bce.avg)
         self.writer.add_scalar('epoch/dice', losses_dice.avg)
+        self.writer.add_scalar('epoch/iou', losses_iou.avg)
         for m in metrics:
             self.writer.add_scalar(f'epoch/{m.name}', m.avg)
 
@@ -146,17 +150,19 @@ class Trainer(BaseTrainer):
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
+        losses_iou = AverageMeter('loss_iou')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
-                loss, bce, dice = self.loss(output, target)
+                loss, bce, dice, iou = self.loss(output, target)
 
                 losses_comb.update(loss.item(), data.size(0))
                 losses_bce.update(bce.item(),   data.size(0))
                 losses_dice.update(dice.item(), data.size(0))
+                losses_iou.update(iou.item(), data.size(0))
 
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
@@ -165,6 +171,7 @@ class Trainer(BaseTrainer):
         self.writer.add_scalar('loss', losses_comb.avg)
         self.writer.add_scalar('bce', losses_bce.avg)
         self.writer.add_scalar('dice', losses_dice.avg)
+        self.writer.add_scalar('iou', losses_iou.avg)
         for m in metrics:
             self.writer.add_scalar(m.name, m.avg)
 
