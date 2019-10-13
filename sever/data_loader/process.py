@@ -107,7 +107,7 @@ class PostProcessor:
         mask = self._component_domination(mask)
         for c in range(self.N_CLASSES):
             if mask[c, :, :].sum() < self.min_class_sizes[c]:
-                mask[c, 0, 0] = 0  # wipe the predictions
+                mask[c, :, :] = 0  # wipe the predictions
         return mask
 
     # -- default value handlers -------------------------------------------------------------------
