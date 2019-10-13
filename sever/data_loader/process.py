@@ -4,52 +4,6 @@ import numpy as np
 import cv2
 
 
-# https://www.kaggle.com/paulorzp/rle-functions-run-lenght-encode-decode
-def mask2rle(img):
-    '''
-    img: numpy array, 1 -> mask, 0 -> background
-    Returns run length as string formated
-    '''
-    pixels = img.T.flatten()
-    pixels = np.concatenate([[0], pixels, [0]])
-    runs = np.where(pixels[1:] != pixels[:-1])[0] + 1
-    runs[1::2] -= runs[::2]
-    return ' '.join(str(x) for x in runs)
-
-
-def rle2mask(mask_rle, shape):
-    """
-    mask_rle: run-length as string formatted (start length)
-    shape: (width,height) of array to return
-    Returns numpy array, 1 - mask, 0 - background
-    """
-    s = mask_rle.split()
-    starts, lengths = [np.asarray(x, dtype=int) for x in
-                       (s[0:][::2], s[1:][::2])]
-    starts -= 1
-    ends = starts + lengths
-    img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
-    for lo, hi in zip(starts, ends):
-        img[lo:hi] = 1
-    return img.reshape(shape).T
-
-
-def make_mask(labels):
-    '''Given a row index, return image_id and mask (256, 1600, 4) from the dataframe `df`'''
-    masks = np.zeros((256, 1600, 4), dtype=np.float32)  # float32 is V.Imp
-
-    for idx, label in enumerate(labels.values):
-        if label == label:  # NaN check
-            label = label.split(" ")
-            positions = map(int, label[0::2])
-            length = map(int, label[1::2])
-            mask = np.zeros(256 * 1600, dtype=np.uint8)
-            for pos, le in zip(positions, length):
-                mask[pos:(pos + le)] = 1
-            masks[:, :, idx] = mask.reshape(256, 1600, order='F')
-    return masks
-
-
 class PostProcessor:
 
     N_CLASSES = 4
@@ -135,6 +89,14 @@ class PostProcessor:
         return np.array([min_sizes] * self.N_CLASSES)
 
 
+def make_mask(labels):
+    masks = np.zeros((256, 1600, 4), dtype=np.float32)
+    for c, label in enumerate(labels.values):
+        rle = RLE.from_str(label)
+        masks[:, :, c] = rle.to_mask()
+    return masks
+
+
 class RLE:
     """
     Encapsulates run-length-encoding functionality.
@@ -203,3 +165,50 @@ class RLE:
 
     def __repr__(self):
         return self.__str__()
+
+
+# -- comparison functions -------------------------------------------------------------------------
+
+# https://www.kaggle.com/paulorzp/rle-functions-run-lenght-encode-decode
+def mask2rle(img):
+    '''
+    img: numpy array, 1 -> mask, 0 -> background
+    Returns run length as string formated
+    '''
+    pixels = img.T.flatten()
+    pixels = np.concatenate([[0], pixels, [0]])
+    runs = np.where(pixels[1:] != pixels[:-1])[0] + 1
+    runs[1::2] -= runs[::2]
+    return ' '.join(str(x) for x in runs)
+
+
+def rle2mask(mask_rle, shape):
+    """
+    mask_rle: run-length as string formatted (start length)
+    shape: (width,height) of array to return
+    Returns numpy array, 1 - mask, 0 - background
+    """
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in
+                       (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(shape).T
+
+
+def make_mask_kaggle(labels):
+    masks = np.zeros((256, 1600, 4), dtype=np.float32)  # float32 is V.Imp
+
+    for idx, label in enumerate(labels.values):
+        if label == label:  # NaN check
+            label = label.split(" ")
+            positions = map(int, label[0::2])
+            length = map(int, label[1::2])
+            mask = np.zeros(256 * 1600, dtype=np.uint8)
+            for pos, le in zip(positions, length):
+                mask[pos:(pos + le)] = 1
+            masks[:, :, idx] = mask.reshape(256, 1600, order='F')
+    return masks
