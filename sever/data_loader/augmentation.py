@@ -131,6 +131,20 @@ class RandomCropMediumTransforms(AugmentationBase):
         ])
 
 
+class RandomCrop256x400Transforms(AugmentationBase):
+
+    def __init__(self):
+        super().__init__()
+
+    def build_train(self):
+        return Compose([
+            RandomCrop(self.H, 416),
+            Flip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+
 class MaskCropTransforms(AugmentationBase):
 
     def __init__(self):

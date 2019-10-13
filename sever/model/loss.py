@@ -100,12 +100,13 @@ class SmoothBCEDiceLoss(BCEDiceLoss):
     def __init__(
             self,
             eps: float = 1e-7,
+            smooth: float = 1e-6,
             threshold: float = None,
             bce_weight: float = 0.5,
             dice_weight: float = 0.5,
     ):
         super().__init__(eps, threshold, bce_weight, dice_weight)
-        self.bce_loss = SmoothBCELoss(eps)
+        self.bce_loss = SmoothBCELoss(smooth)
 
 
 class IoULoss(nn.Module):

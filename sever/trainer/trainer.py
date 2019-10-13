@@ -105,16 +105,17 @@ class Trainer(BaseTrainer):
                     self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
                     self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
 
+        del data
+        del target
+        del output
+        torch.cuda.empty_cache()
+
         self.writer.add_scalar('epoch/loss', losses_comb.avg)
         self.writer.add_scalar('epoch/bce',  losses_bce.avg)
         self.writer.add_scalar('epoch/dice', losses_dice.avg)
         self.writer.add_scalar('epoch/iou', losses_iou.avg)
         for m in metrics:
             self.writer.add_scalar(f'epoch/{m.name}', m.avg)
-
-        del data
-        del target
-        del output
 
         log = {
             'loss': losses_comb.avg,
@@ -166,6 +167,11 @@ class Trainer(BaseTrainer):
 
                 for i, value in enumerate(self._eval_metrics(output, target)):
                     metrics[i].update(value, data.size(0))
+
+        del data
+        del target
+        del output
+        torch.cuda.empty_cache()
 
         self.writer.set_step((epoch), 'valid')
         self.writer.add_scalar('loss', losses_comb.avg)

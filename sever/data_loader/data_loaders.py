@@ -26,7 +26,7 @@ class SteelDataLoader(DataLoader):
         if train:
             dataset = SteelDatasetTrainVal(self.train_df, self.data_dir, transforms.copy(), True)
         else:
-            dataset = SteelDatasetTest(self.df, self.data_dir, transforms.copy())
+            dataset = SteelDatasetTest(self.train_df, self.data_dir, transforms.copy())
 
         if train and balance is not None and alpha is not None:
             class_idxs = self.sort_classes(self.train_df)
@@ -77,5 +77,5 @@ class SteelDataLoader(DataLoader):
         else:
             dataset = SteelDatasetTrainVal(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
-            return DataLoader(dataset, self.bs // 2,
+            return DataLoader(dataset, self.bs,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)
