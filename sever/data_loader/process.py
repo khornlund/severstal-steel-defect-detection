@@ -17,6 +17,23 @@ def mask2rle(img):
     return ' '.join(str(x) for x in runs)
 
 
+def rle2mask(mask_rle, shape):
+    """
+    mask_rle: run-length as string formatted (start length)
+    shape: (width,height) of array to return
+    Returns numpy array, 1 - mask, 0 - background
+    """
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in
+                       (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(shape).T
+
+
 def make_mask(labels):
     '''Given a row index, return image_id and mask (256, 1600, 4) from the dataframe `df`'''
     masks = np.zeros((256, 1600, 4), dtype=np.float32)  # float32 is V.Imp
@@ -36,51 +53,86 @@ def make_mask(labels):
 class PostProcessor:
 
     N_CLASSES = 4
+    MIN_COMPONENT_SIZE = 200
 
-    def __init__(self, thresholds=None, min_sizes=None):
-        self.thresholds = self._setup_thresholds(thresholds)
-        self.min_sizes  = self._setup_min_sizes(thresholds)
+    def __init__(self, p_thresh=None, min_class_sizes=None):
+        self.p_thresh = self._setup_p_thresh(p_thresh)
+        self.min_class_sizes = self.min_class_sizes(min_class_sizes)
 
-    def process(self, class_, probability):
-        '''Post processing of each predicted mask, components with lesser number of pixels
-        than `min_size` are ignored'''
-        pr_th = self.thresholds[class_]
-        sz_th = self.min_sizes[class_]
+    def _component_domination(self, preds):
+        """
+        Ensure that no predictions in the multi-channel mask overlap. Larger predicted components
+        will overwrite overlapping predictions.
+        """
+        components, component_sizes = self._find_components(preds)
+        mask = self._write_preds(components, component_sizes)
+        return mask
 
-        mask = cv2.threshold(probability, pr_th, 1, cv2.THRESH_BINARY)[1]
-        n_components, labels = cv2.connectedComponents(mask.astype(np.uint8))
-        predictions = np.zeros((256, 1600), np.float32)
-        num = 0
-        for component in range(1, n_components):
-            p = (labels == component)
-            if p.sum() > sz_th:
-                predictions[p] = 1
-                num += 1
-        return predictions, num
+    def _find_components(self, preds):
+        C, H, W = preds.shape
+        total_components = 0
+        channel_components = []
+        for c in range(C):
+            max_label, labelled_components = cv2.connectedComponents(preds[c].astype(np.uint8))
+            n_components = max_label - 1
+            labelled_components[labelled_components > 0] += total_components  # offset labels
+            total_components += n_components
+            channel_components.append(labelled_components)
+        components = np.stack(channel_components, axis=0)
+        component_sizes = [(label, (components == label).sum())
+                           for label in range(1, total_components + 1)]
+        component_sizes = sorted(component_sizes, key=lambda item: item[1])  # sort by size
+        return components, component_sizes
+
+    def _write_preds(self, components, component_sizes):
+        C, H, W = components.shape
+        mask = np.zeros((C, H, W), dtype=np.uint8)
+        for label, size in component_sizes:
+            if size < self.MIN_COMPONENT_SIZE:
+                continue
+            component_mask_3d = components == label
+            component_mask_flatten = component_mask_3d.any(axis=0)
+            component_mask_expand = np.repeat(component_mask_flatten[np.newaxis, :, :], C, axis=0)
+
+            # set the mask region to zero across all channels
+            mask[component_mask_expand] = 0
+
+            # set just the channel applicable to the mask to 1
+            mask[component_mask_3d] = 1
+        return mask
+
+    def process(self, probabilities):
+        preds = probabilities > self.p_thresh[:, np.newaxis, np.newaxis]
+        mask = self._component_domination(preds)
+        mask = self._component_domination(mask)
+        for c in range(self.N_CLASSES):
+            if mask[c, :, :].sum() < self.min_class_sizes[c]:
+                mask[c, 0, 0] = 0  # wipe the predictions
+        return mask
 
     # -- default value handlers -------------------------------------------------------------------
 
-    def _setup_thresholds(self, thresholds):
-        if thresholds is None:
-            return [0.5, 0.5, 0.5, 0.5]
-        if isinstance(thresholds, str):
-            return [str(thresholds)] * self.N_CLASSES
-        if isinstance(thresholds, Sequence):
-            if len(thresholds) != self.N_CLASSES:
-                raise Exception(f'Threshold length must be {self.N_CLASSES}. Received {thresholds}')
-            return thresholds
-        return [thresholds] * self.N_CLASSES
+    def _setup_p_thresh(self, p_thresh):
+        if p_thresh is None:
+            return np.array([0.5, 0.5, 0.5, 0.5])
+        if isinstance(p_thresh, str):
+            return np.array([str(p_thresh)] * self.N_CLASSES)
+        if isinstance(p_thresh, Sequence):
+            if len(p_thresh) != self.N_CLASSES:
+                raise Exception(f'Threshold length must be {self.N_CLASSES}. Received {p_thresh}')
+            return np.array(p_thresh)
+        return np.array([p_thresh] * self.N_CLASSES)
 
-    def _setup_min_sizes(self, min_sizes):
+    def min_class_sizes(self, min_sizes):
         if min_sizes is None:
-            return [3500, 3500, 3500, 3500]
+            return np.array([3500, 3500, 3500, 3500])
         if isinstance(min_sizes, str):
-            return [str(min_sizes)] * self.N_CLASSES
+            return np.array([str(min_sizes)] * self.N_CLASSES)
         if isinstance(min_sizes, Sequence):
             if len(min_sizes) != self.N_CLASSES:
                 raise Exception(f'Threshold length must be {self.N_CLASSES}. Received {min_sizes}')
-            return min_sizes
-        return [min_sizes] * self.N_CLASSES
+            return np.array(min_sizes)
+        return np.array([min_sizes] * self.N_CLASSES)
 
 
 class RLE:
@@ -108,7 +160,7 @@ class RLE:
 
     @classmethod
     def from_list(cls, list_):
-        n_items = len(list_) // 2
+        n_items = int(len(list_) / 2)
         items = np.zeros((n_items, 2), dtype=np.uint64)
         for i in range(n_items):
             items[i, 0] = list_[i * 2]
@@ -132,7 +184,9 @@ class RLE:
     def to_mask(self):
         mask = np.zeros(self.MASK_H * self.MASK_W, dtype=np.uint8)
         for run, length in self:
-            mask[run:run + length] = 1
+            run = int(run - 1)
+            end = int(run + length)
+            mask[run:end] = 1
         return mask.reshape(self.MASK_H, self.MASK_W, order='F')
 
     def to_str_list(self):
