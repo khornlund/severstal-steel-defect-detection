@@ -24,9 +24,11 @@ dependencies:
   - future
   - tqdm
   - kaggle
-  - albumentations
+  - scikit-learn
+  - opencv
   - pip
   - pip:
+    - albumentations
     # apex
     # segmentation-models-pytorch
     - -e .  # install package in development mode
