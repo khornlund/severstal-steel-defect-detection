@@ -27,6 +27,24 @@ class SteelDataset(Dataset):
         return len(self.fnames)
 
 
+class SteelDatasetPseudo(SteelDataset):
+
+    img_folder = 'joined_images'
+
+    def __init__(self, df, data_dir, transforms, train):
+        super().__init__(df, data_dir, transforms)
+        self.transforms.build_transforms(train=train)
+
+    def __getitem__(self, idx):
+        mask = make_mask(self.rle(idx))
+        _, img = self.read_greyscale(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        img = augmented['image']
+        mask = augmented['mask']  # 1x256x1600x4
+        mask = mask[0].permute(2, 0, 1)  # 1x4x256x1600
+        return img, mask
+
+
 class SteelDatasetTrainVal(SteelDataset):
 
     img_folder = 'train_images'

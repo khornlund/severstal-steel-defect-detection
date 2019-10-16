@@ -1,0 +1,67 @@
+arch:
+  args:
+    activation: null
+    classes: 4
+    decoder_merge_policy: cat
+    dropout: 0.1
+    encoder_name: efficientnet-b5
+    encoder_weights: imagenet
+    in_channels: 1
+    weight_std: false
+  type: FPN
+augmentation: Heavy256x400Transforms
+data_loader:
+  args:
+    batch_size: 12
+    data_dir: data/raw/severstal-steel-defect-detection
+    nworkers: 4
+    shuffle: true
+    validation_split: 0.2
+    alpha: -0.2
+  type: SteelPseudoDataLoader
+device: 0
+loss:
+  args:
+    iou_weight: 0
+    bce_weight: 0.4
+    dice_weight: 0.6
+  type: SmoothBCEDiceIoULoss
+lr_scheduler:
+  args:
+    n_epochs: 400
+    start_anneal: 50
+  type: CosineAnnealingScheduler
+metrics:
+- dice_0
+- dice_1
+- dice_2
+- dice_3
+- dice_mean
+name: sever-cuda:0-FPN-efficientnet-b5-SmoothBCEDiceLoss-RAdam
+optimizer:
+  type: RAdam
+  encoder:
+    lr: 0.00003
+    weight_decay: 0.00003
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
+  args:
+    lr: 0.001
+    weight_decay: 0.0002
+save_dir: saved/
+seed: 1234567
+short_name: sever-cuda:0
+testing:
+  batch_size: 128
+  data_dir: data/
+  nworkers: 8
+  verbose: 2
+training:
+  early_stop: 50
+  epochs: 399
+  monitor: min val_loss
+  save_period: 1
+  tensorboard: true
+  unfreeze_encoder: 0
+  verbose: 2

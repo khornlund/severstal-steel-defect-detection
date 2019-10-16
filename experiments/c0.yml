@@ -1,6 +1,6 @@
 short_name: sever-cuda:0
 save_dir: saved/
-seed: 1234
+seed: 12345
 device: 0
 
 arch:
@@ -22,21 +22,25 @@ data_loader:
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
+    alpha: null
+    balance: null
     validation_split: 0.2
 
 augmentation: RandomCropMediumTransforms
 
 loss:
-  type: SmoothBCEDiceLoss
+  type: SmoothBCEDiceIoULoss
   args:
     bce_weight: 0.6
     dice_weight: 0.4
+    iou_weight: 0.
+    smooth: 0.00001
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
     start_anneal: 50
-    n_epochs: 251
+    n_epochs: 301
 
 metrics:
   - dice_0
@@ -47,15 +51,19 @@ metrics:
 
 optimizer:
   type: RAdam
-  lr_encoder: 0.00003
-  lr_decoder: 0.003
+  encoder:
+    lr: 0.00003
+    weight_decay: 0.00003
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
   args:
     lr: 0.001
-    weight_decay: 0.0005
+    weight_decay: 0.0002
 
 training:
   early_stop: 50
-  epochs: 250
+  epochs: 300
   unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1
@@ -67,8 +75,3 @@ testing:
   batch_size: 128
   nworkers: 8
   verbose: 2
-
-
-# more epochs
-# decay LR later
-# weight BCE heavier than Dice

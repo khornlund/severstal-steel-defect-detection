@@ -121,6 +121,8 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
+        if epoch < 50:
+            return
         arch = type(self.model).__name__
         state = {
             'arch': arch,

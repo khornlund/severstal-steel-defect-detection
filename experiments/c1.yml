@@ -1,43 +1,45 @@
 short_name: sever-cuda:1
 save_dir: saved/
-seed: 1234
+seed: 12345
 device: 1
 
 arch:
-  type: FPN
+  type: Unet
   args:
-    encoder_name: efficientnet-b0
+    encoder_name: efficientnet-b5
     encoder_weights: imagenet
     classes: 4
     in_channels: 1
     activation: null
-    dropout: 0.2
+    dropout: 0.15
     weight_std: true
-    decoder_merge_policy: cat
-    decoder_activation: swish
 
 data_loader:
   type: SteelDataLoader
   args:
-    batch_size: 52
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 4
     shuffle: true
+    alpha: 0.3
+    balance: random
     validation_split: 0.2
 
 augmentation: RandomCropMediumTransforms
 
 loss:
-  type: SmoothBCEDiceLoss
+  type: SmoothBCEDiceIoULoss
   args:
-    bce_weight: 0.7
-    dice_weight: 0.3
+    bce_weight: 0.6
+    dice_weight: 0.25
+    iou_weight: 0.15
+    smooth: 0.0001
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 90
-    n_epochs: 351
+    start_anneal: 50
+    n_epochs: 301
 
 metrics:
   - dice_0
@@ -48,15 +50,19 @@ metrics:
 
 optimizer:
   type: RAdam
-  lr_encoder: 0.00003
-  lr_decoder: 0.003
+  encoder:
+    lr: 0.00003
+    weight_decay: 0.00003
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
   args:
     lr: 0.001
     weight_decay: 0.0002
 
 training:
   early_stop: 50
-  epochs: 350
+  epochs: 300
   unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1

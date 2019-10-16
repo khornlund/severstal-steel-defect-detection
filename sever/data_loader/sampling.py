@@ -67,7 +67,7 @@ class SamplerFactory:
         return class_sizes, weights
 
     def _balance_weights(self, weight_a, weight_b, alpha):
-        assert alpha >= 0 and alpha <= 1, f'invalid alpha {alpha}, must be 0 <= alpha <= 1'
+        # assert alpha >= 0 and alpha <= 1, f'invalid alpha {alpha}, must be 0 <= alpha <= 1'
         beta = 1 - alpha
         weights = (alpha * weight_a) + (beta * weight_b)
         self.logger.info(f'Target batch class distribution {weights} using alpha={alpha}')

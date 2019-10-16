@@ -7,7 +7,7 @@ import cv2
 class PostProcessor:
 
     N_CLASSES = 4
-    MIN_COMPONENT_SIZE = 200
+    MIN_COMPONENT_SIZE = 20
 
     def __init__(self, p_thresh=None, min_class_sizes=None):
         self.p_thresh = self._setup_p_thresh(p_thresh)
@@ -58,7 +58,6 @@ class PostProcessor:
     def process(self, probabilities):
         preds = probabilities > self.p_thresh[:, np.newaxis, np.newaxis]
         mask = self._component_domination(preds)
-        mask = self._component_domination(mask)
         for c in range(self.N_CLASSES):
             if mask[c, :, :].sum() < self.min_class_sizes[c]:
                 mask[c, :, :] = 0  # wipe the predictions
