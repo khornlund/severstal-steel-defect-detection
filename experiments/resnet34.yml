@@ -1,6 +1,6 @@
 short_name: sever-cuda:1
 save_dir: saved/
-seed: 222
+seed: 2222
 device: 1
 
 arch:
@@ -11,8 +11,7 @@ arch:
     classes: 4
     in_channels: 1
     activation: null
-    # dropout: 0.10
-    # weight_std: false
+    dropout: 0.10
 
 data_loader:
   type: SteelPseudoDataLoader
@@ -32,7 +31,6 @@ loss:
     bce_weight: 0.6
     dice_weight: 0.4
     iou_weight: 0.0
-    smooth: 0.0001
 
 lr_scheduler:
   type: CosineAnnealingScheduler

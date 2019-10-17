@@ -1,23 +1,22 @@
-short_name: sever-cuda:1
+short_name: sever-cuda:0
 save_dir: saved/
-seed: 222
-device: 1
+seed: 2222
+device: 0
 
 arch:
   type: Unet
   args:
-    encoder_name: resnet34
+    encoder_name: se_resnext50_32x4d
     encoder_weights: imagenet
     classes: 4
     in_channels: 1
     activation: null
-    # dropout: 0.10
-    # weight_std: false
+    dropout: 0.10
 
 data_loader:
   type: SteelPseudoDataLoader
   args:
-    batch_size: 32
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
@@ -32,7 +31,6 @@ loss:
     bce_weight: 0.6
     dice_weight: 0.4
     iou_weight: 0.0
-    smooth: 0.0001
 
 lr_scheduler:
   type: CosineAnnealingScheduler

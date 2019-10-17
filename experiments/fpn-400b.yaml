@@ -17,19 +17,19 @@ data_loader:
     nworkers: 4
     shuffle: true
     validation_split: 0.2
-    alpha: -0.2
+    alpha: -0.15
   type: SteelPseudoDataLoader
 device: 1
 loss:
   args:
     iou_weight: 0
-    bce_weight: 0.4
-    dice_weight: 0.6
+    bce_weight: 0.6
+    dice_weight: 0.4
   type: SmoothBCEDiceIoULoss
 lr_scheduler:
   args:
-    n_epochs: 100
-    start_anneal: 1
+    n_epochs: 350
+    start_anneal: 50
   type: CosineAnnealingScheduler
 metrics:
 - dice_0
@@ -59,7 +59,7 @@ testing:
   verbose: 2
 training:
   early_stop: 50
-  epochs: 399
+  epochs: 351
   monitor: min val_loss
   save_period: 1
   tensorboard: true
