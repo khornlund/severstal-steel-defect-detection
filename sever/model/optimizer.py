@@ -1,7 +1,7 @@
 import math
 import torch
 from torch.optim.optimizer import Optimizer
-from apex.optimizers import FusedAdam
+# from apex.optimizers import FusedAdam
 
 
 class Ranger(Optimizer):
@@ -291,10 +291,10 @@ class PlainRAdam(Optimizer):
         return loss
 
 
-class ApexFusedAdam(FusedAdam):
-    """
-    Simple wrapper around Apex FusedAdam
-    """
+# class ApexFusedAdam(FusedAdam):
+#     """
+#     Simple wrapper around Apex FusedAdam
+#     """
 
-    def __init__(self, params, **kwargs):
-        super().__init__(params, **kwargs)
+#     def __init__(self, params, **kwargs):
+#         super().__init__(params, **kwargs)
