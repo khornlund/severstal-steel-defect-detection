@@ -132,7 +132,7 @@ class SteelPseudoDataLoader(DataLoader):
         if self.val_df.empty:
             return None
         else:
-            dataset = SteelDatasetTrainVal(
+            dataset = SteelDatasetPseudo(
                 self.val_df, self.data_dir, self.transforms.copy(), False)
             return DataLoader(dataset, self.bs,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)
