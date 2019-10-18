@@ -22,6 +22,7 @@ class Trainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.bs)) * 8
         self.unfreeze_encoder = config['training']['unfreeze_encoder']
+        self.start_val_epoch = config['training']['start_val_epoch']
 
         self.logger.info('Freezing encoder weights')
         for p in self.model.encoder.parameters():
@@ -69,7 +70,11 @@ class Trainer(BaseTrainer):
             output = self.model(data)
             # self.logger.info(f'output: {output.size()}')
             # self.logger.info(f'target: {target.size()}')
-            loss, bce, dice, iou = self.loss(output, target)
+            loss_dict = self.loss(output, target)
+            loss = loss_dict['loss']
+            bce = loss_dict.get('bce', torch.tensor([0]))
+            dice = loss_dict.get('dice', torch.tensor([0]))
+            iou = loss_dict.get('iou', torch.tensor([0]))
 
             loss.backward()
             self.optimizer.step()
@@ -122,7 +127,7 @@ class Trainer(BaseTrainer):
             'metrics': [m.avg for m in metrics]
         }
 
-        if self.do_validation:
+        if self.do_validation and (epoch == 1 or epoch >= self.start_val_epoch):
             val_log = self._valid_epoch(epoch)
             log = {**log, **val_log}
 
@@ -158,7 +163,11 @@ class Trainer(BaseTrainer):
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
-                loss, bce, dice, iou = self.loss(output, target)
+                loss_dict = self.loss(output, target)
+                loss = loss_dict['loss']
+                bce = loss_dict.get('bce', torch.tensor([0]))
+                dice = loss_dict.get('dice', torch.tensor([0]))
+                iou = loss_dict.get('iou', torch.tensor([0]))
 
                 losses_comb.update(loss.item(), data.size(0))
                 losses_bce.update(bce.item(),   data.size(0))

@@ -78,8 +78,9 @@ class BCEDiceLoss(nn.Module):
 
         bce = self.bce_loss(outputs, targets)
         dice = self.dice_loss(outputs, targets)
+        loss = self.bce_weight * bce + self.dice_weight * dice
         return {
-            'loss': self.bce_weight * bce + self.dice_weight * dice,
+            'loss': loss,
             'bce': bce,
             'dice': dice
         }
@@ -210,7 +211,25 @@ class BinaryFocalLoss(_Loss):
             label_target = label_target[not_ignored]
 
         loss = self.focal_loss(label_input, label_target)
-        return {'loss': loss}
+        return loss
+
+
+class FocalBCEDiceLoss(BCEDiceLoss):
+
+    def __init__(
+            self,
+            alpha=0.5,
+            gamma=2,
+            ignore_index=None,
+            reduction="mean",
+            reduced=False,
+            eps: float = 1e-7,
+            threshold: float = None,
+            bce_weight: float = 0.5,
+            dice_weight: float = 0.5,
+    ):
+        super().__init__(eps, threshold, bce_weight, dice_weight)
+        self.bce_loss = BinaryFocalLoss(alpha, gamma, ignore_index, reduction, reduced, threshold)
 
 
 # -- utils ----------------------------------------------------------------------------------------
