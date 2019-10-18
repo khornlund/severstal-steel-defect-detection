@@ -7,6 +7,7 @@ from functools import partial
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.loss import _Loss
 
 
 def bce_loss(output, target):
@@ -77,8 +78,11 @@ class BCEDiceLoss(nn.Module):
 
         bce = self.bce_loss(outputs, targets)
         dice = self.dice_loss(outputs, targets)
-
-        return (self.bce_weight * bce + self.dice_weight * dice), bce, dice
+        return {
+            'loss': self.bce_weight * bce + self.dice_weight * dice,
+            'bce': bce,
+            'dice': dice
+        }
 
 
 class SmoothBCELoss(nn.Module):
@@ -90,7 +94,7 @@ class SmoothBCELoss(nn.Module):
 
     def forward(self, outputs, targets):
         return self.loss(
-            self.smoother(outputs),
+            outputs,
             self.smoother(targets)
         )
 
@@ -156,8 +160,57 @@ class SmoothBCEDiceIoULoss(nn.Module):
         iou = self.iou_loss(outputs, targets)
 
         total = self.bce_weight * bce + self.dice_weight * dice + self.iou_weight * iou
+        return {'loss': total, 'bce': bce, 'dice': dice, 'iou': iou}
 
-        return total, bce, dice, iou
+
+class BinaryFocalLoss(_Loss):
+    def __init__(
+        self,
+        alpha=0.5,
+        gamma=2,
+        ignore_index=None,
+        reduction="mean",
+        reduced=False,
+        threshold=0.5,
+    ):
+        """
+        :param alpha:
+        :param gamma:
+        :param ignore_index:
+        :param reduced:
+        :param threshold:
+        """
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+        if reduced:
+            self.focal_loss = partial(
+                focal_loss_with_logits,
+                alpha=None,
+                gamma=gamma,
+                threshold=threshold,
+                reduction=reduction,
+            )
+        else:
+            self.focal_loss = partial(
+                focal_loss_with_logits, alpha=alpha, gamma=gamma, reduction=reduction
+            )
+
+    def forward(self, label_input, label_target):
+        """Compute focal loss for binary classification problem.
+        """
+        label_target = label_target.view(-1)
+        label_input = label_input.view(-1)
+
+        if self.ignore_index is not None:
+            # Filter predictions with ignore label from loss computation
+            not_ignored = label_target != self.ignore_index
+            label_input = label_input[not_ignored]
+            label_target = label_target[not_ignored]
+
+        loss = self.focal_loss(label_input, label_target)
+        return {'loss': loss}
 
 
 # -- utils ----------------------------------------------------------------------------------------
@@ -232,3 +285,62 @@ def dice(
     dice = 2 * intersection / (union + eps)
 
     return dice
+
+
+def focal_loss_with_logits(
+    input: torch.Tensor,
+    target: torch.Tensor,
+    gamma=2.0,
+    alpha: float = 0.25,
+    reduction="mean",
+    normalized=False,
+    threshold: float = None,
+) -> torch.Tensor:
+    """
+    https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/losses/functional.py
+    Compute binary focal loss between target and output logits.
+    See :class:`~pytorch_toolbelt.losses.FocalLoss` for details.
+    Args:
+        input: Tensor of arbitrary shape
+        target: Tensor of the same shape as input
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            'none' | 'mean' | 'sum' | 'batchwise_mean'. 'none': no reduction will be applied,
+            'mean': the sum of the output will be divided by the number of
+            elements in the output, 'sum': the output will be summed. Note: :attr:`size_average`
+            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
+            specifying either of those two args will override :attr:`reduction`.
+            'batchwise_mean' computes mean loss per sample in batch. Default: 'mean'
+        normalized (bool): Compute normalized focal loss (https://arxiv.org/pdf/1909.07829.pdf).
+        threshold (float, optional): Compute reduced focal loss (https://arxiv.org/abs/1903.01347).
+    References::
+        https://github.com/open-mmlab/mmdetection/blob/master/mmdet/core/loss/losses.py
+    """
+    target = target.type(input.type())
+
+    logpt = -F.binary_cross_entropy_with_logits(input, target, reduction="none")
+    pt = torch.exp(logpt)
+
+    # compute the loss
+    if threshold is None:
+        focal_term = (1 - pt).pow(gamma)
+    else:
+        focal_term = ((1.0 - pt) / threshold).pow(gamma)
+        focal_term[pt < threshold] = 1
+
+    loss = -focal_term * logpt
+
+    if alpha is not None:
+        loss = loss * (alpha * target + (1 - alpha) * (1 - target))
+
+    if normalized:
+        norm_factor = focal_term.sum()
+        loss = loss / norm_factor
+
+    if reduction == "mean":
+        loss = loss.mean()
+    if reduction == "sum":
+        loss = loss.sum()
+    if reduction == "batchwise_mean":
+        loss = loss.sum(0)
+
+    return loss
