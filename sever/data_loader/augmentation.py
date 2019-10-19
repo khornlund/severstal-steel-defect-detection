@@ -177,6 +177,37 @@ class HeavyCropTransforms(AugmentationBase):
         ])
 
 
+class HeavyCropClasTransforms(AugmentationBase):
+
+    def __init__(self, height, width):
+        super().__init__()
+        self.height = height
+        self.width = width
+
+    def build_train(self):
+        return Compose([
+            OneOf([
+                CropNonEmptyMaskIfExists(self.height, self.width),
+                RandomCrop(self.height, self.width)
+            ], p=1),
+            OneOf([
+                CLAHE(p=0.5),  # modified source to get this to work
+                GaussianBlur(3, p=0.3),
+                IAASharpen(alpha=(0.2, 0.3), p=0.3),
+            ], p=1),
+            Flip(p=0.5),
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+    def build_test(self):
+        return Compose([
+            RandomCrop(self.height, self.width),  # not fully conv, so need to limit img size
+            Normalize(mean=self.MEAN, std=self.STD),
+            ToTensor(),
+        ])
+
+
 class MaskCropTransforms(AugmentationBase):
 
     def __init__(self):

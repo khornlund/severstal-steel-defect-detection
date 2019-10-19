@@ -1,29 +1,35 @@
-short_name: sever-cuda:1
+short_name: sever-cuda:0
 save_dir: saved/
-seed: 2222
-device: 1
+seed: 43211234
+device: 0
 
 arch:
-  type: Unet
+  type: FPN
   args:
-    encoder_name: resnet34
+    encoder_name: se_resnext50_32x4d
     encoder_weights: imagenet
     classes: 4
     in_channels: 1
     activation: null
     dropout: 0.10
+    decoder_merge_policy: cat
+    weight_std: false
 
 data_loader:
   type: SteelPseudoDataLoader
   args:
-    batch_size: 32
+    batch_size: 36
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
     validation_split: 0.2
     alpha: -0.15
 
-augmentation: Heavy256x400Transforms
+augmentation:
+  type: HeavyCropTransforms
+  args:
+    height: 256
+    width: 416
 
 loss:
   type: SmoothBCEDiceIoULoss
@@ -58,7 +64,8 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  early_stop: 50
+  start_val_epoch: 75
+  early_stop: 100
   epochs: 300
   unfreeze_encoder: 0
   monitor: min val_loss

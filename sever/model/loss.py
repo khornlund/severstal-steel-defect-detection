@@ -94,10 +94,19 @@ class SmoothBCELoss(nn.Module):
         self.loss = nn.BCEWithLogitsLoss()
 
     def forward(self, outputs, targets):
-        return self.loss(
-            outputs,
-            self.smoother(targets)
-        )
+        return self.loss(outputs, self.smoother(targets))
+
+
+class ClasSmoothBCELoss(nn.Module):
+
+    def __init__(self, eps=1e-8, pos_weight=[1, 1, 1, 1]):
+        super().__init__()
+        self.smoother = LabelSmoother(eps)
+        pos_weight = torch.tensor(pos_weight)
+        self.loss = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
+    def forward(self, outputs, targets):
+        return {'loss': self.loss(outputs, self.smoother(targets))}
 
 
 class SmoothBCEDiceLoss(BCEDiceLoss):

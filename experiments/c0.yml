@@ -6,7 +6,7 @@ device: 0
 arch:
   type: Unet
   args:
-    encoder_name: efficientnet-b5
+    encoder_name: efficientnet-b0
     encoder_weights: imagenet
     classes: 4
     in_channels: 1
@@ -17,7 +17,7 @@ arch:
 data_loader:
   type: SteelPseudoDataLoader
   args:
-    batch_size: 10
+    batch_size: 32
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
@@ -27,12 +27,9 @@ data_loader:
 augmentation: Heavy256x400Transforms
 
 loss:
-  type: SmoothBCEDiceIoULoss
+  type: BinaryFocalLoss
   args:
-    bce_weight: 0.6
-    dice_weight: 0.4
-    iou_weight: 0.0
-    smooth: 0.0001
+    reduction: mean
 
 lr_scheduler:
   type: CosineAnnealingScheduler

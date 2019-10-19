@@ -9,12 +9,12 @@ arch:
     encoder_name: efficientnet-b5
     pretrained: true
     classes: 4
-    in_channels: r
+    in_channels: g
 
 data_loader:
   type: SteelClasPseudoDataLoader
   args:
-    batch_size: 8
+    batch_size: 12
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
@@ -22,15 +22,16 @@ data_loader:
     alpha: -0.15
 
 augmentation:
-  type: HeavyCropTransforms
+  type: HeavyCropClasTransforms
   args:
-    height: 256
+    height: 128
     width: 800
 
 loss:
-  type: SmoothBCELoss
+  type: ClasSmoothBCELoss
   args:
     eps: 0.001
+    pos_weight: [5, 10, 1.5, 5]
 
 lr_scheduler:
   type: CosineAnnealingScheduler
