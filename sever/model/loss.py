@@ -94,7 +94,10 @@ class SmoothBCELoss(nn.Module):
         self.loss = nn.BCEWithLogitsLoss()
 
     def forward(self, outputs, targets):
-        return self.loss(outputs, self.smoother(targets))
+        return self.loss(
+            self.smoother(outputs),  # this was a mistake, but better results?
+            self.smoother(targets)
+        )
 
 
 class ClasSmoothBCELoss(nn.Module):
