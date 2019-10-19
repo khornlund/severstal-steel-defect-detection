@@ -127,7 +127,7 @@ class Trainer(BaseTrainer):
             'metrics': [m.avg for m in metrics]
         }
 
-        if self.do_validation and (epoch == 1 or epoch >= self.start_val_epoch):
+        if self.do_validation and (epoch == 0 or epoch >= self.start_val_epoch):
             val_log = self._valid_epoch(epoch)
             log = {**log, **val_log}
 
