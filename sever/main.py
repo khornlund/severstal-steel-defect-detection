@@ -61,6 +61,7 @@ class Runner:
 
         self.logger.debug('Getting loss and metric function handles')
         loss = get_instance(module_loss, 'loss', config)
+        loss.to(device)
         metrics = [getattr(module_metric, met) for met in config['metrics']]
 
         self.logger.debug('Initialising trainer')
