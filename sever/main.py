@@ -3,12 +3,13 @@ import random
 
 import numpy as np
 import torch
-import segmentation_models_pytorch as module_arch
+#import segmentation_models_pytorch as module_arch
 
 import sever.data_loader.data_loaders as module_data
 import sever.model.loss as module_loss
 import sever.model.metric as module_metric
 import sever.model.optimizer as module_optimizer
+import sever.model.model as module_arch
 # import torch.optim as module_optimizer
 import sever.model.scheduler as module_scheduler
 import sever.data_loader.augmentation as module_aug
@@ -52,7 +53,7 @@ class Runner:
         model, optimizer = self._resume_checkpoint(resume, model, optimizer)
 
         self.logger.debug('Getting augmentations')
-        transforms = getattr(module_aug, config['augmentation'])()
+        transforms = get_instance(module_aug, 'augmentation', config)
 
         self.logger.debug('Getting data_loader instance')
         data_loader = get_instance(module_data, 'data_loader', config, transforms)

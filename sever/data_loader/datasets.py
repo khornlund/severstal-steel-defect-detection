@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 from torch.utils.data import Dataset
 
 from .process import make_mask
@@ -9,6 +10,7 @@ class SteelDataset(Dataset):
     img_folder = 'implement me!'
     N_CLASSES = 4
     rle_cols = [f'rle{i}' for i in range(N_CLASSES)]
+    bin_cols = [f'c{i}' for i in range(N_CLASSES)]
 
     def __init__(self, df, data_dir, transforms):
         self.df = df
@@ -22,6 +24,9 @@ class SteelDataset(Dataset):
 
     def rle(self, idx):
         return self.df.iloc[idx][self.rle_cols]
+
+    def binary(self, idx):
+        return self.df.iloc[idx][self.bin_cols]
 
     def __len__(self):
         return len(self.fnames)
@@ -75,3 +80,21 @@ class SteelDatasetTest(SteelDataset):
         f, image = self.read_greyscale(idx)
         images = self.transforms(image=image)["image"]
         return f, images
+
+
+class SteelClasDatasetPseudo(SteelDataset):
+
+    img_folder = 'joined_images'
+
+    def __init__(self, df, data_dir, transforms, train):
+        super().__init__(df, data_dir, transforms)
+        self.transforms.build_transforms(train=train)
+
+    def __getitem__(self, idx):
+        mask = make_mask(self.rle(idx))
+        _, img = self.read_greyscale(idx)
+        augmented = self.transforms(image=img, mask=mask)
+        img = augmented['image']
+        mask = augmented['mask']  # 1x256x1600x4
+        targets = np.array([mask[:, :, :, c].sum() > 0 for c in range(4)], dtype=np.float32)
+        return img, targets

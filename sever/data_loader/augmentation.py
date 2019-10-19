@@ -153,16 +153,18 @@ class RandomCrop256x400Transforms(AugmentationBase):
         ])
 
 
-class Heavy256x400Transforms(AugmentationBase):
+class HeavyCropTransforms(AugmentationBase):
 
-    def __init__(self):
+    def __init__(self, height, width):
         super().__init__()
+        self.height = height
+        self.width = width
 
     def build_train(self):
         return Compose([
             OneOf([
-                CropNonEmptyMaskIfExists(self.H, 416),
-                RandomCrop(self.H, 416)
+                CropNonEmptyMaskIfExists(self.height, self.width),
+                RandomCrop(self.height, self.width)
             ], p=1),
             OneOf([
                 CLAHE(p=0.5),  # modified source to get this to work
@@ -197,7 +199,7 @@ class CLAHE(ImageOnlyTransform):
 
     Args:
         clip_limit (float or (float, float)): upper threshold value for contrast limiting.
-            If clip_limit is a single float value, the range will be (1, clip_limit). Default: (1, 4).
+            If clip_limit is a single float value, the range will be (1, clip_limit).
         tile_grid_size ((int, int)): size of grid for histogram equalization. Default: (8, 8).
         p (float): probability of applying the transform. Default: 0.5.
 

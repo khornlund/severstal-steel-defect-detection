@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torchvision.utils import make_grid
+# from torchvision.utils import make_grid
 
 from sever.base import BaseTrainer
 
@@ -61,7 +61,7 @@ class Trainer(BaseTrainer):
         losses_comb = AverageMeter('loss_comb')
         losses_bce  = AverageMeter('loss_bce')
         losses_dice = AverageMeter('loss_dice')
-        losses_iou = AverageMeter('loss_iou')
+        losses_iou  = AverageMeter('loss_iou')
         metrics = [AverageMeter(m.__name__) for m in self.metrics]
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
@@ -99,16 +99,16 @@ class Trainer(BaseTrainer):
                 self._log_batch(epoch, batch_idx, self.data_loader.bs,
                                 len(self.data_loader), loss.item())
 
-            if batch_idx == 0:
-                with torch.no_grad():
-                    data = data.cpu()
-                    target = torch.max(target, dim=1, keepdim=True)[0].cpu()
-                    output = torch.max(output, dim=1, keepdim=True)[0].cpu()
+            # if batch_idx == 0:
+            #     with torch.no_grad():
+            #         data = data.cpu()
+            #         target = torch.max(target, dim=1, keepdim=True)[0].cpu()
+            #         output = torch.max(output, dim=1, keepdim=True)[0].cpu()
 
-                    truth = torch.cat([data, target, target], dim=1)
-                    preds = torch.cat([data, output, output], dim=1)
-                    self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
-                    self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
+            #         truth = torch.cat([data, target, target], dim=1)
+            #         preds = torch.cat([data, output, output], dim=1)
+            #         self.writer.add_image('truth', make_grid(truth, nrow=8, normalize=True))
+            #         self.writer.add_image('preds', make_grid(preds, nrow=8, normalize=True))
 
         del data
         del target
