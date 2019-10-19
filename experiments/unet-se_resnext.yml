@@ -14,7 +14,7 @@ arch:
     dropout: 0.10
 
 data_loader:
-  type: SteelPseudoDataLoader
+  type: SteelSegPseudoDataLoader
   args:
     batch_size: 24
     data_dir: data/raw/severstal-steel-defect-detection

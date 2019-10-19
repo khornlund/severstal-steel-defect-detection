@@ -1,5 +1,6 @@
+apt-get install nano -y
 apt-get install unzip -y
-apt-get isnstall wget -y
+apt-get install wget -y
 
 mkdir ~/.kaggle
 cd ~/.kaggle
@@ -21,3 +22,6 @@ mv test_images.zip joined_images/
 cd joined_images
 unzip train_images.zip
 unzip test_images.zip
+
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8

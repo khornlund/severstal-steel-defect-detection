@@ -6,7 +6,7 @@ device: 1
 arch:
   type: EffNet
   args:
-    encoder_name: efficientnet-b5
+    encoder_name: efficientnet-b4
     pretrained: true
     classes: 4
     in_channels: g
@@ -14,7 +14,7 @@ arch:
 data_loader:
   type: SteelClasPseudoDataLoader
   args:
-    batch_size: 12
+    batch_size: 8
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true

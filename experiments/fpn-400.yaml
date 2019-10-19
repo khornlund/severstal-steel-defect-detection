@@ -18,7 +18,7 @@ data_loader:
     shuffle: true
     validation_split: 0.2
     alpha: -0.2
-  type: SteelPseudoDataLoader
+  type: SteelSegPseudoDataLoader
 device: 0
 loss:
   args:
