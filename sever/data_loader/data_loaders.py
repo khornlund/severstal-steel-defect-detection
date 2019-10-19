@@ -200,3 +200,29 @@ class SteelClasPseudoDataLoader(DataLoader):
                 self.val_df, self.data_dir, self.transforms.copy(), False)
             return DataLoader(dataset, self.bs,
                               num_workers=self.nworkers, pin_memory=self.pin_memory)
+
+
+class SteelClasTestDataLoader(DataLoader):
+
+    test_csv  = 'sample_submission.csv'
+
+    def __init__(self, transforms, data_dir, batch_size, nworkers, pin_memory=True):
+        self.transforms = transforms
+        self.bs, self.nworkers, self.pin_memory = batch_size, nworkers, pin_memory
+        self.data_dir = Path(data_dir)
+
+        self.test_df = self.load_df(True)
+
+        dataset = SteelDatasetTest(self.test_df, self.data_dir, transforms.copy(), False)
+        super().__init__(dataset, batch_size=self.bs, num_workers=nworkers, pin_memory=pin_memory)
+
+    def load_df(self):
+        df = pd.read_csv(self.data_dir / self.test_csv)
+        df['ImageId'], df['ClassId'] = zip(*df['ImageId_ClassId'].str.split('_'))
+        df['ClassId'] = df['ClassId'].astype(int)
+        df = df.pivot(index='ImageId', columns='ClassId', values='EncodedPixels')
+        df.columns = [f'rle{c}' for c in range(4)]
+        return df
+
+    def split_validation(self):
+        raise Exception('Attempt to split a validation data_loader from a test-only data_loader')
