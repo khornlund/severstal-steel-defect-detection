@@ -45,19 +45,19 @@ def dice_single_channel(probability, truth, threshold, eps=1e-9):
 
 
 def accuracy_0(output, targets, threshold=0.5):
-    return accuracy(output, targets, 0)
+    return accuracy(output, targets, 0, threshold)
 
 
 def accuracy_1(output, targets, threshold=0.5):
-    return accuracy(output, targets, 1)
+    return accuracy(output, targets, 1, threshold)
 
 
 def accuracy_2(output, targets, threshold=0.5):
-    return accuracy(output, targets, 2)
+    return accuracy(output, targets, 2, threshold)
 
 
 def accuracy_3(output, targets, threshold=0.5):
-    return accuracy(output, targets, 3)
+    return accuracy(output, targets, 3, threshold)
 
 
 def accuracy(output, targets, class_, threshold=0.5):
@@ -66,46 +66,50 @@ def accuracy(output, targets, class_, threshold=0.5):
 
 
 def precision_0(output, targets, threshold=0.5):
-    return precision(output, targets, 0)
+    return precision(output, targets, 0, threshold)
 
 
 def precision_1(output, targets, threshold=0.5):
-    return precision(output, targets, 1)
+    return precision(output, targets, 1, threshold)
 
 
 def precision_2(output, targets, threshold=0.5):
-    return precision(output, targets, 2)
+    return precision(output, targets, 2, threshold)
 
 
 def precision_3(output, targets, threshold=0.5):
-    return precision(output, targets, 3)
+    return precision(output, targets, 3, threshold)
 
 
 def precision(output, targets, class_, threshold):
     preds = (output[:, class_] > threshold).float()
-    tp, fp, tn, fn = _confusion(preds, targets)
+    tp, fp, tn, fn = _confusion(preds, targets[:, class_])
+    if tp == 0 and fp == 0:
+        return 1
     return tp / (tp + fp)
 
 
 def recall_0(output, targets, threshold=0.5):
-    return recall(output, targets, 0)
+    return recall(output, targets, 0, threshold)
 
 
 def recall_1(output, targets, threshold=0.5):
-    return recall(output, targets, 1)
+    return recall(output, targets, 1, threshold)
 
 
 def recall_2(output, targets, threshold=0.5):
-    return recall(output, targets, 2)
+    return recall(output, targets, 2, threshold)
 
 
 def recall_3(output, targets, threshold=0.5):
-    return recall(output, targets, 3)
+    return recall(output, targets, 3, threshold)
 
 
 def recall(output, targets, class_, threshold):
     preds = (output[:, class_] > threshold).float()
-    tp, fp, tn, fn = _confusion(preds, targets)
+    tp, fp, tn, fn = _confusion(preds, targets[:, class_])
+    if tp == 0 and fn == 0:
+        return 1
     return tp / (tp + fn)
 
 
