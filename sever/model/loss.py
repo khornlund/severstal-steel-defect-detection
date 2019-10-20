@@ -126,6 +126,58 @@ class SmoothBCEDiceLoss(BCEDiceLoss):
         self.bce_loss = SmoothBCELoss(smooth)
 
 
+class DeepSmoothBCEDiceLoss(nn.Module):
+
+    def __init__(
+        self,
+        eps=1e-7,
+        smooth=1e-6,
+        threshold=None,
+        bce_weight=0.5,
+        dice_weight=0.5,
+        depth_weights=[1, 0.5, 0.25, 0.1]
+    ):
+        super().__init__()
+
+        if bce_weight == 0 and dice_weight == 0:
+            raise ValueError(
+                "Both bce_wight and dice_weight cannot be "
+                "equal to 0 at the same time."
+            )
+
+        self.bce_weight = bce_weight
+        self.dice_weight = dice_weight
+        self.depth_weights = depth_weights
+
+        if self.bce_weight != 0:
+            self.bce_loss = SmoothBCELoss(smooth)
+        if self.dice_weight != 0:
+            self.dice_loss = DiceLoss(eps=eps, threshold=threshold)
+
+    def forward_single(self, outputs, targets):
+        if self.bce_weight == 0:
+            return self.dice_weight * self.dice_loss(outputs, targets)
+        if self.dice_weight == 0:
+            return self.bce_weight * self.bce_loss(outputs, targets)
+
+        bce = self.bce_loss(outputs, targets)
+        dice = self.dice_loss(outputs, targets)
+        loss = self.bce_weight * bce + self.dice_weight * dice
+        return loss
+
+    def forward(self, outputs, targets):
+        assert len(outputs) == len(self.depth_weights)
+        losses = []
+        weight_total = 0
+        for idx, o in enumerate(outputs):
+            weight = self.depth_weights[idx]
+            if weight == 0:
+                continue
+            losses.append(self.forward_single(o, targets) * weight)
+            weight_total += weight
+        return {'loss': torch.stack(losses, dim=0).sum(dim=0) / weight_total}
+
+
 class IoULoss(nn.Module):
     """
     Intersection over union (Jaccard) loss

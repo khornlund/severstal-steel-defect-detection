@@ -1,0 +1,77 @@
+short_name: sever-cuda:1
+save_dir: saved/
+seed: 44344
+device: 1
+
+arch:
+  type: PANet
+  args:
+    encoder_name: se_resnext50_32x4d
+    encoder_weights: imagenet
+    classes: 4
+    in_channels: r
+    activation: null
+
+data_loader:
+  type: SteelSegPseudoDataLoader
+  args:
+    batch_size: 16
+    data_dir: data/raw/severstal-steel-defect-detection
+    nworkers: 8
+    shuffle: true
+    validation_split: 0.2
+    alpha: -0.15
+
+augmentation:
+  type: HeavyCropTransforms
+  args:
+    height: 256
+    width: 416
+
+loss:
+  type: SmoothBCEDiceIoULoss
+  args:
+    bce_weight: 0.6
+    dice_weight: 0.4
+    iou_weight: 0.0
+
+lr_scheduler:
+  type: CosineAnnealingScheduler
+  args:
+    start_anneal: 50
+    n_epochs: 301
+
+metrics:
+  - dice_0
+  - dice_1
+  - dice_2
+  - dice_3
+  - dice_mean
+
+optimizer:
+  type: RAdam
+  encoder:
+    lr: 0.00003
+    weight_decay: 0.00003
+  decoder:
+    lr: 0.003
+    weight_decay: 0.0003
+  args:
+    lr: 0.001
+    weight_decay: 0.0002
+
+training:
+  start_val_epoch: 70
+  early_stop: 100
+  epochs: 300
+  unfreeze_encoder: 0
+  monitor: min val_loss
+  save_period: 1
+  tensorboard: true
+  verbose: 2
+
+testing:
+  data_dir: data/
+  batch_size: 128
+  nworkers: 8
+  verbose: 2
