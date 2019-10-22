@@ -1,22 +1,23 @@
 short_name: sever-cuda:0
 save_dir: saved/
-seed: 1111
+seed: 666
 device: 0
 
 arch:
   type: Unet
   args:
-    encoder_name: se_resnext50_32x4d
+    encoder_name: efficientnet-b5
     encoder_weights: imagenet
-    classes: 5
+    classes: 4
     in_channels: r
     activation: null
     dropout: 0.10
+    decoder_channels: [256, 256, 128, 64, 32]
 
 data_loader:
   type: SteelSegPseudoDataLoader
   args:
-    batch_size: 20
+    batch_size: 16
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
@@ -26,20 +27,21 @@ data_loader:
 augmentation:
   type: HeavyCropTransforms
   args:
-    height: 256
-    width: 416
+    height: 128
+    width: 800
 
 loss:
-  type: SmoothSoftmaxBCEDiceLoss
+  type: SmoothBCEDiceLoss
   args:
     bce_weight: 0.6
     dice_weight: 0.4
+    smooth: 0.0001
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
     start_anneal: 50
-    n_epochs: 251
+    n_epochs: 301
 
 metrics:
   - dice_0
@@ -51,7 +53,7 @@ metrics:
 optimizer:
   type: RAdam
   encoder:
-    lr: 0.00007
+    lr: 0.00003
     weight_decay: 0.00003
   decoder:
     lr: 0.003
@@ -61,9 +63,9 @@ optimizer:
     weight_decay: 0.0002
 
 training:
-  start_val_epoch: 100
+  start_val_epoch: 75
   early_stop: 100
-  epochs: 250
+  epochs: 300
   unfreeze_encoder: 0
   monitor: min val_loss
   save_period: 1

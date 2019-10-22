@@ -1,6 +1,6 @@
 short_name: sever-cuda:0
 save_dir: saved/
-seed: 55455
+seed: 66466
 device: 0
 
 arch:
@@ -11,12 +11,12 @@ arch:
     classes: 4
     in_channels: r
     activation: null
-    deep_supervision: false
+    deep_supervision: true
 
 data_loader:
   type: SteelSegPseudoDataLoader
   args:
-    batch_size: 16
+    batch_size: 10
     data_dir: data/raw/severstal-steel-defect-detection
     nworkers: 8
     shuffle: true
@@ -27,19 +27,18 @@ augmentation:
   type: HeavyCropTransforms
   args:
     height: 256
-    width: 416
+    width: 384
 
 loss:
   type: SmoothBCEDiceLoss
   args:
     bce_weight: 0.6
     dice_weight: 0.4
-    # depth_weights: [1, 0.5, 0.25, 0.1]
 
 lr_scheduler:
   type: CosineAnnealingScheduler
   args:
-    start_anneal: 50
+    start_anneal: 30
     n_epochs: 301
 
 metrics:
@@ -52,7 +51,7 @@ metrics:
 optimizer:
   type: RAdam
   encoder:
-    lr: 0.00003
+    lr: 0.0001
     weight_decay: 0.00003
   decoder:
     lr: 0.003

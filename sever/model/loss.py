@@ -126,6 +126,77 @@ class SmoothBCEDiceLoss(BCEDiceLoss):
         self.bce_loss = SmoothBCELoss(smooth)
 
 
+class SmoothSoftmaxBCEDiceLoss(nn.Module):
+
+    def __init__(
+            self,
+            eps: float = 1e-7,
+            smooth: float = 1e-6,
+            threshold: float = None,
+            bce_weight: float = 0.5,
+            dice_weight: float = 0.5,
+    ):
+        super().__init__()
+
+        if bce_weight == 0 and dice_weight == 0:
+            raise ValueError(
+                "Both bce_wight and dice_weight cannot be "
+                "equal to 0 at the same time."
+            )
+
+        self.bce_weight = bce_weight
+        self.dice_weight = dice_weight
+
+        if self.bce_weight != 0:
+            self.bce_loss = SmoothSoftmaxBCELoss(smooth=smooth)
+
+        if self.dice_weight != 0:
+            self.dice_loss = DiceLoss(eps=eps, threshold=threshold)
+
+    def forward(self, outputs, targets):
+        # add background to targets
+        background = (torch.sum(targets, dim=1, keepdim=True) == 0).float()
+        targets = torch.cat([targets, background], dim=1)
+        bce = self.bce_loss(outputs, targets)
+        dice = self.dice_loss(outputs, targets)
+        loss = self.bce_weight * bce + self.dice_weight * dice
+        return {
+            'loss': loss,
+            'bce': bce,
+            'dice': dice
+        }
+
+
+class SmoothSoftmaxBCELoss(nn.Module):
+
+    def __init__(self, smooth):
+        super().__init__()
+        self.act = nn.Softmax(dim=1)
+        self.bce = nn.BCELoss()
+        self.smooth = LabelSmoother(eps=smooth)
+
+    def forward(self, outputs, targets):
+        return self.bce(
+            self.act(outputs),
+            self.smooth(targets)
+        )
+
+
+class CrossEntropyLossWrapper(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.ce = nn.CrossEntropyLoss()
+
+    def forward(self, outputs, targets):
+        targets[:, 1, :, :] *= 2
+        targets[:, 2, :, :] *= 3
+        targets[:, 3, :, :] *= 4
+        targets = torch.max(targets, dim=1, keepdim=True)[0].long()
+        print(targets)
+        return self.ce(outputs, targets)
+
+
 class DeepSmoothBCEDiceLoss(nn.Module):
 
     def __init__(
