@@ -23,7 +23,7 @@ Winning submission:
 
 +-----------+-------------+
 | Public LB |  Private LB |
-+===========+=============+
++-----------+-------------+
 |  0.92124  | **0.90883** |
 +-----------+-------------+
 
@@ -31,7 +31,7 @@ My best submission:
 
 +-----------+-------------+
 | Public LB |  Private LB |
-+===========+=============+
++-----------+-------------+
 |  0.91817  | **0.91023** |
 +-----------+-------------+
 
@@ -39,7 +39,7 @@ My chosen submission:
 
 +-----------+------------+
 | Public LB | Private LB |
-+===========+============+
++-----------+------------+
 |  0.91844  |   0.90274  |
 +-----------+------------+
 
@@ -51,18 +51,19 @@ I used `segmentation_models.pytorch <https://github.com/qubvel/segmentation_mode
 as a framework for all of my models. It's a really nice package and easy to extend, so I implemented
 a few of my own encoder and decoder modules.
 
-I used an ensemble of models, covered below.
+I used an ensemble of models for my submissions, covered below.
 
 Encoders
 ~~~~~~~~
 I ported `EfficientNet <https://github.com/lukemelas/EfficientNet-PyTorch>`_ to the above framework
 and had great results. I was hoping this would be a competitive advantage, but during the
-competition someone added an EfficientNet encoder to SMP. I used the `b5` model for most of the
-competition, and found the smaller models didn't work as well.
+competition someone added an EfficientNet encoder to SMP and many others started using it. I used
+the `b5` model for most of the competition, and found the smaller models didn't work as well.
 
 I also ported ``InceptionV4`` late in the competition and had pretty good results.
 
 I ported a few others that didn't yield good results:
+
     - `Res2Net <https://github.com/gasvn/Res2Net>`_
     - `Dilated ResNet <https://github.com/wuhuikai/FastFCN/blob/master/encoding/dilated/resnet.py>`_
 
@@ -71,7 +72,7 @@ memory as the `efficientnet-b5`, I could use larger batch and image sizes which 
 
 Decoders
 ~~~~~~~~
-I used Unet + FPN from SMP.
+I used ``Unet`` + ``FPN`` from SMP. I added ``Dropout`` to the ``Unet`` implementation.
 
 I implemented `Nested Unet <https://github.com/bigmb/Unet-Segmentation-Pytorch-Nest-of-Unets/blob/master/Models.py>`_
 such that it could use pretrained encoders, but it didn't yield good results.
@@ -102,6 +103,10 @@ These are the highest (private) scoring single models of each architecture.
 Training
 --------
 
+GPU
+~~~
+Early on I used a 2080Ti at home. For the final stretch I rented some Tesla V100's in the cloud.
+
 Loss
 ~~~~
 I used (0.6 * BCE) + (0.4 * (1 - Dice)). I applied smoothing (1e-6) to the labels.
@@ -113,10 +118,13 @@ two kinds of detects, the lower predictions were removed in post-processing.
 
 Optimizer
 ~~~~~~~~~
-RAdam
-
-Encoder learning rate 7e-5
-Decoder learning rate 3e-3
+- RAdam
+- Encoder
+    - learning rate 7e-5
+    - weight decay: 3e-5 (not applied to bias)
+- Decoders
+    - learning rate 3e-3
+    - weight decay: 3e-4 (not applied to bias)
 
 LR Schedule
 ~~~~~~~~~~~
@@ -128,14 +136,14 @@ Image Sizes
 256x384, 256x416, 256x448, 256x480
 
 Larger image sizes gave better results, but so did larger batch sizes. The ``se_resnext50_32x4d``
-encoders could use a batch size of 32-46, while the ``efficientnet-b5`` encoders typically used a
+encoders could use a batch size of 32-36, while the ``efficientnet-b5`` encoders typically used a
 batch size of 16-20.
 
 Grayscale Input
 ~~~~~~~~~~~~~~~
-The images were provided as 3-channel grayscale. I modified the models to accept 1 channel input,
-by recycling pretrained weights. I did a bunch of testing around this as I was worried it might
-hurt performance, but using 3-channel input didn't give better results.
+The images were provided as 3-channel duplicated grayscale. I modified the models to accept 1
+channel input, by recycling pretrained weights. I did a bunch of testing around this as I was
+worried it might hurt convergence, but using 3-channel input didn't give better results.
 
 I parameterised the recycling of the weights so I could train models using the R, G, or B pretrained
 weights for the first conv layer. My hope was that this would produce a more diverse model ensemble.
@@ -161,6 +169,8 @@ I used the following `Albumentations <https://github.com/albu/albumentations>`_:
         ToTensor(),
     ])
 
+I found the ``mean`` and ``std`` from the training images.
+
 It would have been nice to experiment with more of these, but it took so long to train the models
 it was difficult. I found these augs worked better than simple crops/flips and stuck with them.
 
@@ -183,17 +193,21 @@ Post Processing & Submission
 
 TTA
 ~~~
-Only flip along dim 3 (W). I found this wasn't very useful in this competition, and consumed
+Only flip along dim 3 (W). I found TTA wasn't very useful in this competition, and consumed
 valuable submission time.
 
 Prediction Thresholds
 ~~~~~~~~~~~~~~~~~~~~~
 I used 0.5 for each class ie. if the output was > 0.5, the output was positive for that defect.
 
+I was worried that tweaking these would risk overfitting public LB.
+
 Defect Pixel Thresholds
 ~~~~~~~~~~~~~~~~~~~~~~~
 I used 600, 600, 1000, 2000. If an image had fewer than this number of defect pixels for a class,
 all predictions for that class were set to zero.
+
+I tested some different values but it actually didn't have much impact.
 
 Ensemble Averaging
 ~~~~~~~~~~~~~~~~~~
@@ -266,7 +280,7 @@ progressed and I was struggling to climb the LB, I thought I'd better give it a 
 
 Since I'd spent so long tuning my fully convolutional segmentation ensemble, I was worried about
 allowing an "untuned" classifier to veto my segmentation predictions (and tuning it takes time).
-I decided on a strategy to use the classification prediction to modulate the defect pixel
+I decided on a strategy to use the classification prediction to amplify the defect pixel
 thresholds:
 
     1. When the classifier output is high (fault), we leave the pixel thresholds at their normal
@@ -312,15 +326,33 @@ I ran it twice with ``c_scale = 5`` and changed some weights in my ensemble.
 +---------------+-----------+------------+
 
 From looking at my public LB score, I got zero and tiny improvements using a classifier and
-c_scale=5. When I tried increasing it, it looked like the results got much worse. Unknown to me,
+``c_scale=5``. When I tried increasing it, it looked like the results got much worse. Unknown to me,
 this was actually taking my private LB score from rank 11 to significantly better than rank 1! The
 first result, where my public LB score didn't increase at all, was actually the highest scoring
-submission I made all competition. As far as I know, no one has reported scoring this high on
-any of their submissions.
+submission I made all competition. As far as I know, no one on the discussion board has reported
+scoring this high on any of their submissions.
 
 I gave up on using a classifier after this, and for the rest of my submissions I used only
 fully convolutional models. I may go back at some stage and see how well my improved convolutional
 ensemble would have performed with the help of a classifier.
+
+Final Ensemble
+~~~~~~~~~~~~~~
+- ``Unet``
+    - 2x ``se_resnext50_32x4d``
+    - 1x ``efficientnet-b5``
+- ``FPN``
+    - 3x ``se_resnext50_32x4d``
+    - 1x ``efficientnet-b5``
+    - 1x ``inceptionv4``
+
+Submission Scores
+~~~~~~~~~~~~~~~~~
+Visualisation of scores in the final week of the competition:
+
+.. image:: ./resources/final-week-lb-scores.png
+
+The dip at the end is when I started using RMS averaging.
 
 Folder Structure
 ================
