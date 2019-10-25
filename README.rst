@@ -1,45 +1,180 @@
-=================================
-Severstal: Steel Defect Detection
-=================================
+=========================================================================================================
+`Severstal: Steel Defect Detection <https://www.kaggle.com/c/severstal-steel-defect-detection/overview>`_
+=========================================================================================================
 
-.. contents:: Table of Contents
+*Severstal is leading the charge in efficient steel mining and production. The company recently
+created the country’s largest industrial data lake, with petabytes of data that were previously
+discarded. Severstal is now looking to machine learning to improve automation, increase efficiency,
+and maintain high quality in their production.
+
+In this competition, you’ll help engineers improve the algorithm by localizing and classifying
+surface defects on a steel sheet.*
+
+.. contents::
    :depth: 2
 
-Submission Log
-==============
 
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| Score  |  Dice   | Model |     Loss      | Optimizer | LR (enc,dec) |     Scheduler     | Epochs |            Notes                    |
-+========+=========+=======+===============+===========+==============+===================+========+=====================================+
-| .87975 |         |  B4   |      BCE      |   RAdam   | 1e-3         |        Step       |    2   | First sub.                          |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .86438 |         |  B5   |      BCE      |   RAdam   | 1e-3         | .5 @ 2, 10, 20    |   12   | Removed no-defect imgs              |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .83393 |         |  B5   |   Soft Dice   |   RAdam   | 1e-3         | .5 @ 2, 10, 20    |   5    | No defect imgs                      |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .83079 |         |  B2   |   Soft Dice   |   RAdam   | 5e-4         | .1 @ 2, 10, 20    |   30   | Incl. no defect. Grayscale          |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .88803 |         |  B2   |   BCE + Dice  |   RAdam   | 5e-4         | .1 @ 2, 10, 20    |   20   | Good loss function!                 |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .88239 |         |  B2   |   BCE + Dice  |   RAdam   | 5e-4         | .1 @ 2, 10, 20    |   20   | min_sizes = 1500, 2000, 3500, 3500  |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .88239 |         |  B2   |   BCE + Dice  |   RAdam   | 5e-4         | .1 @ 2, 10, 20    |   20   | min_sizes = 1100, 1250, 2800, 3500  |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .89169 |  .9259  |  B2   |   BCE + Dice  |   RAdam   | 8e-4         | .1 @ 2, 10, 20    |   14   | min_sizes = 3500                    |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .87641 |  .9134  |  B2   |   BCE + Dice  |   RAdam   | 1e-3         | .1 @ 2, 10, 20    |   13   |                                     |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .89251 |  .9280  |  B0   | SmoothBCEDice |   RAdam   | 3e-5, 3e-3   | anneal start 50   |  168   | 256x256 crops                       |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
-| .87877 |  .9248  |  B0   | SmoothBCEDice |   RAdam   | 3e-5, 3e-3   | anneal start 50   |  211   | better loss than above but overfit? |
-+--------+---------+-------+---------------+-----------+--------------+-------------------+--------+-------------------------------------+
+Competition Report
+==================
+
+Results
+-------
+Winning submission:
+
++-----------+------------+
+| Public LB | Private LB |
++===========+============+
+|  0.92124  |  0.90883   |
++-----------+------------+
+
+My best submission:
+
++-----------+------------+
+| Public LB | Private LB |
++===========+============+
+|  0.91817  |  0.91023   |
++-----------+------------+
+
+My chosen submission:
+
++-----------+------------+
+| Public LB | Private LB |
++===========+============+
+|  0.91844  |   0.90274  |
++-----------+------------+
+
+I made some poor choices choosing my submission, and ended up rank 55/2436.
+
+Models
+------
+I used `segmentation_models.pytorch <https://github.com/qubvel/segmentation_models.pytorch>`_ (SMP)
+as a framework for all of my models. It's a really nice package and easy to extend, so I implemented
+a few of my own encoder and decoder modules.
+
+I used an ensemble of models, covered below.
+
+Encoders
+~~~~~~~~
+I ported `EfficientNet <https://github.com/lukemelas/EfficientNet-PyTorch>`_ to the above framework
+and had great results. I was hoping this would be a competitive advantage, but during the
+competition someone added an EfficientNet encoder to SMP. I used the `b5` model for most of the
+competition, and found the smaller models didn't work as well.
+
+I also ported ``InceptionV4`` late in the competition and had pretty good results.
+
+I ported a few others that didn't yield good results:
+    - `Res2Net <https://github.com/gasvn/Res2Net>`_
+    - `Dilated ResNet <https://github.com/wuhuikai/FastFCN/blob/master/encoding/dilated/resnet.py>`_
+
+I had good results using ``se_resnext50_32x4d`` too. I found that because it didn't consume as much
+memory as the `efficientnet-b5`, I could use larger batch and image sizes which led to improvements.
+
+Decoders
+~~~~~~~~
+I used Unet + FPN from SMP.
+
+I implemented `Nested Unet <https://github.com/bigmb/Unet-Segmentation-Pytorch-Nest-of-Unets/blob/master/Models.py>`_
+such that it could use pretrained encoders, but it didn't yield good results.
+
+Other
+~~~~~
+I ported `DeepLabV3 <https://github.com/pytorch/vision/blob/master/torchvision/models/segmentation/deeplabv3.py>`_
+to SMP but didn't get good results.
+
+Scores
+~~~~~~
+These are the highest (private) scoring single models of each architecture.
+
++--------------------+---------+-----------+------------+
+|       Encoder      | Decoder | Public LB | Private LB |
++====================+=========+===========+============+
+|  efficientnet-b5   |    FPN  |  0.91631  |   0.90110  |
++--------------------+---------+-----------+------------+
+|  efficientnet-b5   |   Unet  |  0.91665  |   0.89769  |
++--------------------+---------+-----------+------------+
+| se_resnext50_32x4d |    FPN  |  0.91744  |   0.90038  |
++--------------------+---------+-----------+------------+
+| se_resnext50_32x4d |   Unet  |  0.91685  |   0.89647  |
++--------------------+---------+-----------+------------+
+|    inceptionv4     |    FPN  |  0.91667  |   0.89149  |
++--------------------+---------+-----------+------------+
+
+Training
+--------
+
+Loss
+~~~~
+I used (0.6 * BCE) + (0.4 * (1 - Dice)). I applied smoothing (1e-6) to the labels.
+
+Optimizer
+~~~~~~~~~
+RAdam
+
+Encoder learning rate 7e-5
+Decoder learning rate 3e-3
+
+LR Schedule
+~~~~~~~~~~~
+Flat for 30 epochs, then cosine anneal over 220 epochs. Typically I stopped training around 150-200
+epochs.
+
+Image Sizes
+~~~~~~~~~~~
+256x384, 256x416, 256x448, 256x480
+
+Larger image sizes gave better results, but so did larger batch sizes. The ``se_resnext50_32x4d``
+encoders could use a batch size of 32-46, while the ``efficientnet-b5`` encoders typically used a
+batch size of 16-20.
+
+Grayscale Input
+~~~~~~~~~~~~~~~
+The images were provided as 3-channel grayscale. I modified the models to accept 1 channel input,
+by recycling pretrained weights. I did a bunch of testing around this as I was worried it might
+hurt performance, but using 3-channel input didn't give better results.
+
+I parameterised the recycling of the weights so I could train models using the R, G, or B pretrained
+weights for the first conv layer. My hope was that this would produce a more diverse model ensemble.
+
+Augmentation
+~~~~~~~~~~~~
+I used the following `Albumentations <https://github.com/albu/albumentations>`_:
+
+.. code::
+
+    Compose([
+        OneOf([
+            CropNonEmptyMaskIfExists(self.height, self.width),
+            RandomCrop(self.height, self.width)
+        ], p=1),
+        OneOf([
+            CLAHE(p=0.5),  # modified source to get this to work with grayscale
+            GaussianBlur(3, p=0.3),
+            IAASharpen(alpha=(0.2, 0.3), p=0.3),
+        ], p=1),
+        Flip(p=0.5),
+        Normalize(mean=[0.3439], std=[0.0383]),
+        ToTensor(),
+    ])
+
+It would have been nice to experiment with more of these, but it took so long to train the models
+it was difficult. I found these augs worked better than simple crops/flips and stuck with them.
+
+Validation
+~~~~~~~~~~
+I used a random 20% of the training data for validation with each run.
+
+Pseudo Labels
+~~~~~~~~~~~~~
+I used the ensemble outputs of models as pseudo labels, which gave a huge performance boost. I
+used a custom `BatchSampler <https://github.com/khornlund/pytorch-balanced-sampler>`_ to undersample
+(sample rate ~60%) from the pseudo-labelled data, and fix the number of pseudo-labelled samples per
+batch (each batch would contain 12% pseudo-labelled samples).
+
+Some other people had poor results with pseudo-labels. Perhaps the technique above helped mitigate
+whatever downsides they faced.
 
 
-Requirements
-============
-* Python >= 3.6
-* PyTorch >= 1.1
-* Tensorboard >= 1.4
+
 
 Folder Structure
 ================
