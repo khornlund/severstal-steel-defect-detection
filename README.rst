@@ -181,6 +181,20 @@ Validation
 ~~~~~~~~~~
 I used a random 20% of the training data for validation with each run.
 
+Models were largely selected based on their Mean Dice Coefficient. Where a few models had similar
+performance I would look at the Dice Coefficient for the most common class and the loss.
+
+High scoring models I trained had a Mean Dice Coefficient around 0.951 - 0.952. Here's an example
+validation score:
+
+.. code::
+
+    val_dice_0     : 0.9680132865905762
+    val_dice_1     : 0.9881579875946045
+    val_dice_2     : 0.8649587631225586
+    val_dice_3     : 0.9835753440856934
+    val_dice_mean  : 0.9511765241622925
+
 Pseudo Labels
 ~~~~~~~~~~~~~
 I used the ensemble outputs of models as pseudo labels, which gave a huge performance boost. I
@@ -362,8 +376,7 @@ scoring this high on any of their submissions.
 
 I gave up on using a classifier after this, and for the rest of my submissions I used only
 fully convolutional models. I managed to get similar Private LB scores with a fully convolutional
-ensemble, but using a classifier may have improved this further. Kaggle has disabled submissions
-while the efficiency prize is running, so I won't be able to test this.
+ensemble, but using a classifier may have improved this even further.
 
 Final Ensemble
 ~~~~~~~~~~~~~~
