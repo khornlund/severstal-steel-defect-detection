@@ -220,6 +220,22 @@ all predictions for that class were set to zero.
 
 I tested some different values but it actually didn't have much impact.
 
+Component Domination
+~~~~~~~~~~~~~~~~~~~~
+Since my models were set up to predict 4 classes, I was using ``sigmoid`` rather than ``softmax``
+on their outputs, which meant sometimes I got overlapping defect predictions. I had an idea to
+look at the size of each component, and have the larger components "dominate" (remove) smaller
+overlapping components. I got a tiny boost from this, but I think it may simply be because at that
+stage I didn't have another way of ensuring there was only 1 defect prediction at each pixel.
+
+I stopped using this technique in favour of simply taking the highest defect prediction for each
+pixel.
+
+Dilation
+~~~~~~~~
+I tried varying amounts of dilation. Sometimes I got a small improvement, and sometimes got worse
+results so I stopped using it.
+
 Ensemble Averaging
 ~~~~~~~~~~~~~~~~~~
 *Here is where I made the mistake that cost me 1st place.*
