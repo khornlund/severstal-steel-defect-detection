@@ -117,7 +117,7 @@ I used ``(0.6 * BCE) + (0.4 * (1 - Dice))``. I applied smoothing (1e-6) to the l
 Targets
 ~~~~~~~
 I treated this as 4-class classification (no background class). If a pixel was predicted to have
-two kinds of detects, the lower predictions were removed in post-processing.
+two kinds of detects, the lower confidence predictions were removed in post-processing.
 
 Optimizer
 ~~~~~~~~~
@@ -344,8 +344,9 @@ submission I made all competition. As far as I know, no one on the discussion bo
 scoring this high on any of their submissions.
 
 I gave up on using a classifier after this, and for the rest of my submissions I used only
-fully convolutional models. I may go back at some stage and see how well my improved convolutional
-ensemble would have performed with the help of a classifier.
+fully convolutional models. I managed to get similar Private LB scores with a fully convolutional
+ensemble, but using a classifier may have improved this further. Kaggle has disabled submissions
+while the efficiency prize is running, so I won't be able to test this.
 
 Final Ensemble
 ~~~~~~~~~~~~~~
