@@ -30,6 +30,5 @@ dependencies:
   - pip:
     - albumentations
     - efficientnet_pytorch
-    # apex
     # segmentation-models-pytorch
-    - -e .  # install package in development mode
+    - -e .

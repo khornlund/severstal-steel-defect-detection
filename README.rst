@@ -68,7 +68,8 @@ I ported a few others that didn't yield good results:
     - `Dilated ResNet <https://github.com/wuhuikai/FastFCN/blob/master/encoding/dilated/resnet.py>`_
 
 I had good results using ``se_resnext50_32x4d`` too. I found that because it didn't consume as much
-memory as the `efficientnet-b5`, I could use larger batch and image sizes which led to improvements.
+memory as the ``efficientnet-b5``, I could use larger batch and image sizes which led to
+improvements.
 
 Decoders
 ~~~~~~~~
@@ -106,10 +107,12 @@ Training
 GPU
 ~~~
 Early on I used a 2080Ti at home. For the final stretch I rented some Tesla V100's in the cloud.
+I found being able to increase the batch size using the V100 (16GB) gave a significant improvement
+over the 2080Ti (11GB).
 
 Loss
 ~~~~
-I used (0.6 * BCE) + (0.4 * (1 - Dice)). I applied smoothing (1e-6) to the labels.
+I used ``(0.6 * BCE) + (0.4 * (1 - Dice))``. I applied smoothing (1e-6) to the labels.
 
 Targets
 ~~~~~~~
@@ -118,13 +121,13 @@ two kinds of detects, the lower predictions were removed in post-processing.
 
 Optimizer
 ~~~~~~~~~
-- RAdam
-- Encoder
-    - learning rate 7e-5
-    - weight decay: 3e-5 (not applied to bias)
-- Decoders
-    - learning rate 3e-3
-    - weight decay: 3e-4 (not applied to bias)
+    - RAdam
+    - Encoder
+        - learning rate 7e-5
+        - weight decay: 3e-5 (not applied to bias)
+    - Decoders
+        - learning rate 3e-3
+        - weight decay: 3e-4 (not applied to bias)
 
 LR Schedule
 ~~~~~~~~~~~
@@ -152,7 +155,7 @@ Augmentation
 ~~~~~~~~~~~~
 I used the following `Albumentations <https://github.com/albu/albumentations>`_:
 
-.. code::
+.. code:: python
 
     Compose([
         OneOf([
@@ -187,6 +190,14 @@ batch (each batch would contain 12% pseudo-labelled samples).
 
 Some other people had poor results with pseudo-labels. Perhaps the technique above helped mitigate
 whatever downsides they faced.
+
+`Apex Mixed Precision <https://github.com/NVIDIA/apex>`_
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I tried to get this to work for so long in order to take advantage of the larger batch sizes it
+enables. However, now matter what I tried, I had worse convergence using it. Eventually I gave up.
+
+It's possible I was doing something wrong - but I invested a lot of time into trying this, and from
+talking to others at work it seems like they've had similar issues.
 
 Post Processing & Submission
 ----------------------------
@@ -338,13 +349,13 @@ ensemble would have performed with the help of a classifier.
 
 Final Ensemble
 ~~~~~~~~~~~~~~
-- ``Unet``
-    - 2x ``se_resnext50_32x4d``
-    - 1x ``efficientnet-b5``
-- ``FPN``
-    - 3x ``se_resnext50_32x4d``
-    - 1x ``efficientnet-b5``
-    - 1x ``inceptionv4``
+- Unet
+    - 2x se_resnext50_32x4d
+    - 1x efficientnet-b5
+- FPN
+    - 3x se_resnext50_32x4d
+    - 1x efficientnet-b5
+    - 1x inceptionv4
 
 Submission Scores
 ~~~~~~~~~~~~~~~~~
@@ -354,330 +365,124 @@ Visualisation of scores in the final week of the competition:
 
 The dip at the end is when I started using RMS averaging.
 
+Discussion
+----------
+
+Improvements
+~~~~~~~~~~~~
+Next time I would like to:
+
+- Use a background class
+- Lovasz Loss
+- Inplace BatchNorm (potentially huge memory saving)
+
+And of course, *manually choose two submissions that are appropriately diverse*.
+
+Questions
+~~~~~~~~~
+From looking at other people's solutions, I haven't seen anyone else mention label smoothing. I
+found this gave a significant improvement - have others tried it?
+
+Usage
+=====
+
 Folder Structure
-================
+----------------
 
 ::
 
-  cookiecutter-pytorch/
+  severstal-steel-defect-detection/
   │
-  ├── <project name>/
+  ├── sever/
   │    │
   │    ├── cli.py - command line interface
-  │    ├── main.py - main script to start train/test
+  │    ├── main.py - top level entry point to start training
   │    │
   │    ├── base/ - abstract base classes
-  │    │   ├── base_data_loader.py - abstract base class for data loaders
   │    │   ├── base_model.py - abstract base class for models
   │    │   └── base_trainer.py - abstract base class for trainers
   │    │
   │    ├── data_loader/ - anything about data loading goes here
-  │    │   └── data_loaders.py
+  │    │   ├── augmentation.py
+  │    │   ├── data_loaders.py
+  │    │   ├── datasets.py
+  │    │   ├── process.py - pre/post processing, RLE conversion, etc
+  │    │   └── sampling.py - class balanced sampling, used for pseudo labels
   │    │
-  │    ├── model/ - models, losses, and metrics
+  │    ├── model/ - anything to do with nn.Modules, metrics, learning rates, etc
   │    │   ├── loss.py
   │    │   ├── metric.py
-  │    │   └── model.py
+  │    │   ├── model.py
+  │    │   ├── optimizer.py
+  │    │   └── scheduler.py
   │    │
-  │    ├── trainer/ - trainers
+  │    ├── trainer/ - training loop
   │    │   └── trainer.py
   │    │
   │    └── utils/
-  │        ├── logger.py - class for train logging
-  │        ├── visualization.py - class for Tensorboard visualization support
-  │        └── saving.py - manages pathing for saving models + logs
+  │        .
   │
   ├── logging.yml - logging configuration
-  │
-  ├── data/ - directory for storing input data
-  │
-  ├── experiments/ - directory for storing configuration files
-  │
-  ├── saved/ - directory for checkpoints and logs
-  │
-  └── tests/ - tests folder
+  ├── data/ - training data goes here
+  ├── experiments/ - configuration files for training
+  ├── saved/ - checkpoints, logging, and tensorboard records will be saved here
+  └── tests/
 
-
-Usage
-=====
+Environment
+-----------
+Create and activate the ``Anaconda`` environment using:
 
 .. code-block:: bash
 
   $ conda env create --file environment.yml
   $ conda activate sever
 
-The code in this repo is an MNIST example of the template. You can run the tests,
-and the example project using:
+Download
+--------
+You can download the data using ``download.sh``. Note this assumes you have your ``kaggle.json``
+token set up to use the `Kaggle API <https://github.com/Kaggle/kaggle-api>`_.
+
+Training
+--------
+Setup your desired configuration file, and point to it using:
 
 .. code-block:: bash
 
-  $ pytest tests
   $ sever train -c experiments/config.yml
 
-Config file format
-------------------
-Config files are in `.yml` format:
+Upload Trained Model
+--------------------
+Checkpoints can be uploaded to Kaggle using:
 
-.. code-block:: HTML
+.. code-block:: bash
 
-  short_name: Mnist_LeNet
-  n_gpu: 1
-  save_dir: saved/
-  seed: 1234
+  $ sever upload -r <path-to-saved-run> -e <epoch-num>
 
-  arch:
-    type: MnistModel
-    args:
-      verbose: 2
+The checkpoint is inferred from the epoch number. You can select multiple epochs to upload, eg.
 
-  data_loader:
-    type: MnistDataLoader
-    args:
-      batch_size: 128
-      data_dir: data/
-      num_workers: 2
-      shuffle: true
-      validation_split: 0.1
+.. code-block:: bash
 
-  loss: nll_loss
-
-  lr_scheduler:
-    type: StepLR
-    args:
-      gamma: 0.1
-      step_size: 50
-
-  metrics:
-  - my_metric
-  - my_metric2
-
-  optimizer:
-    type: Adam
-    args:
-      lr: 0.001
-      weight_decay: 0
-
-  training:
-    early_stop: 10
-    epochs: 100
-    monitor: min val_loss
-    save_period: 1
-    tensorboard: true
-    verbose: 2
-
-  testing:
-    data_dir: data/
-    batch_size: 128
-    num_workers: 8
-    verbose: 2
-
-
-Add addional configurations if you need.
-
-Using config files
-------------------
-Modify the configurations in `.yml` config files, then run:
-
-.. code-block:: shell
-
-  sever train -c experiments/config.yml
-
-Resuming from checkpoints
--------------------------
-You can resume from a previously saved checkpoint by:
-
-.. code-block:: shell
-
-  sever train --resume path/to/checkpoint
-
-
-Using Multiple GPU
-------------------
-You can enable multi-GPU training by setting `n_gpu` argument of the config file to larger number.
-If configured to use smaller number of gpu than available, first n devices will be used by default.
-Specify indices of available GPUs by cuda environmental variable.
-
-.. code-block:: shell
-
-  sever train --device 2,3 -c experiments/config.yml
-
-
-Customization
-=============
-
-Data Loader
------------
-
-Writing your own data loader
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Inherit `BaseDataLoader`
-^^^^^^^^^^^^^^^^^^^^^^^^
-`BaseDataLoader` is a subclass of `torch.utils.data.DataLoader`, you can use either of them.
-
-`BaseDataLoader` handles:
-* Generating next batch
-* Data shuffling
-* Generating validation data loader by calling
-`BaseDataLoader.split_validation()`
-
-DataLoader Usage
-~~~~~~~~~~~~~~~~
-`BaseDataLoader` is an iterator, to iterate through batches:
-
-.. code-block:: python
-
-  for batch_idx, (x_batch, y_batch) in data_loader:
-      pass
-
-Example
-~~~~~~~
-Please refer to `data_loader/data_loaders.py` for an MNIST data loading example.
-
-Trainer
--------
-
-Writing your own trainer
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Inherit `BaseTrainer`
-^^^^^^^^^^^^^^^^^^^^^
-
-`BaseTrainer` handles:
-1. Training process logging
-2. Checkpoint saving
-3. Checkpoint resuming
-4. Reconfigurable performance monitoring for saving current best model, and early stop training.
-
-  1. If config `monitor` is set to `max val_accuracy`, which means then the trainer will save a
-      checkpoint `model_best.pth` when `validation accuracy` of epoch replaces current `maximum`.
-  2. If config `early_stop` is set, training will be automatically terminated when model
-      performance does not improve for given number of epochs. This feature can be turned off by
-      passing 0 to the `early_stop` option, or just deleting the line of config.
-
-Implementing abstract methods
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-You need to implement `_train_epoch()` for your training process, if you need validation then
-you can implement `_valid_epoch()` as in `trainer/trainer.py`
-
-Example
-~~~~~~~
-Please refer to `trainer/trainer.py` for MNIST training.
-
-Model
------
-
-Writing your own model
-~~~~~~~~~~~~~~~~~~~~~~
-
-Inherit `BaseModel`
-^^^^^^^^^^^^^^^^^^^
-`BaseModel` handles:
-  * Inherited from `torch.nn.Module`
-  * `__str__`: Modify native `print` function to prints the number of trainable parameters.
-
-Implementing abstract methods
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Implement the foward pass method `forward()`
-
-Example
-~~~~~~~
-Please refer to `model/model.py` for a LeNet example.
-
-Loss
-----
-Custom loss functions can be implemented in 'model/loss.py'. Use them by changing the name given in
-"loss" in config file, to corresponding name.
-
-Metrics
-~~~~~~~
-Metric functions are located in `model/metric.py`.
-
-You can monitor multiple metrics by providing a list in the configuration file, eg.
-
-.. code-block:: HTML
-
-  "metrics": ["my_metric", "my_metric2"]
-
-
-Additional logging
-------------------
-If you have additional information to be logged, in `_train_epoch()` of your trainer class, merge
-them with `log` as shown below before returning:
-
-.. code-block:: python
-
-  additional_log = {"gradient_norm": g, "sensitivity": s}
-  log = {**log, **additional_log}
-  return log
-
-Testing
--------
-You can test trained model by running `test.py` passing path to the trained checkpoint by `--resume`
-argument.
-
-Validation data
----------------
-To split validation data from a data loader, call `BaseDataLoader.split_validation()`, it will
-return a validation data loader, with the number of samples according to the specified ratio in your
-config file.
-
-**Note**: the `split_validation()` method will modify the original data loader
-**Note**: `split_validation()` will return `None` if `"validation_split"` is set to `0`
-
-Checkpoints
------------
-You can specify the name of the training session in config files:
-
-.. code-block:: HTML
-
-  "name": "MNIST_LeNet"
-
-
-The checkpoints will be saved in `save_dir/name/timestamp/checkpoint_epoch_n`, with timestamp in
-mmdd_HHMMSS format.
-
-A copy of config file will be saved in the same folder.
-
-**Note**: checkpoints contain:
-
-.. code-block:: python
-
-  {
-    'arch': arch,
-    'epoch': epoch,
-    'state_dict': self.model.state_dict(),
-    'optimizer': self.optimizer.state_dict(),
-    'monitor_best': self.mnt_best,
-    'config': self.config
-  }
-
+  $ sever upload -r saved/sever-unet-b5/1026-140000 -e 123 -e 234
 
 Tensorboard Visualization
 --------------------------
-This template supports `<https://pytorch.org/docs/stable/tensorboard.html>`_ visualization.
+This project supports `<https://pytorch.org/docs/stable/tensorboard.html>`_ visualization.
 
 1. Run training
 
-    Set `tensorboard` option in config file true.
+    Set ``tensorboard`` option in config file true.
 
 2. Open tensorboard server
 
-    Type `tensorboard --logdir saved/runs/` at the project root, then server will open at
-    `http://localhost:6006`
+    Type ``tensorboard --logdir saved/`` at the project root, then server will open at
+    ``http://localhost:6006``
 
-By default, values of loss and metrics specified in config file, input images, and histogram of
-model parameters will be logged. If you need more visualizations, use `add_scalar('tag', data)`,
-`add_image('tag', image)`, etc in the `trainer._train_epoch` method. `add_something()` methods in
-this template are basically wrappers for those of `tensorboard.SummaryWriter` module.
-
-**Note**: You don't have to specify current steps, since `TensorboardWriter` class defined at
-`logger/visualization.py` will track current steps.
 
 Acknowledgments
 ===============
-This template is inspired by
+This project uses the `Cookiecutter PyTorch <https://github.com/khornlund/cookiecutter-pytorch>`_
+template.
 
-  1. `<https://github.com/victoresque/pytorch-template>`_
-  2. `<https://github.com/daemonslayer/cookiecutter-pytorch>`_
+Various code has been copied from Github or Kaggle. In general I put in the docstring where I
+copied it from, but if I haven't referenced it properly I apologise. I know for a bunch of the loss  I
+functions took code from `Catalyst <https://github.com/catalyst-team/catalyst>`_.

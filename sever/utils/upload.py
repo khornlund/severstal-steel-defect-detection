@@ -22,9 +22,9 @@ def kaggle_upload(run_dir, epochs):
 
     # create metadata file
     meta = {
-        'title': str(run_dir.name),
-        'subtitle': str(run_dir.parent.name),
-        'id': f'khornlund/{run_dir.name}',
+        'title': str(run_dir.name).replace('_', '-'),
+        'subtitle': str(run_dir.parent.name).replace('_', '-'),
+        'id': f'khornlund/{run_dir.name}'.replace('_', '-'),
         'licenses': [{'name': 'CC0-1.0'}]
     }
 
@@ -32,7 +32,5 @@ def kaggle_upload(run_dir, epochs):
         json.dump(meta, fh, indent=4)
 
     # upload
-    subprocess.run(
-        ['kaggle', 'datasets', 'create', '-p', str(target_dir), '-r', 'zip'],
-        stdout=subprocess.PIPE
-    )
+    p = subprocess.Popen(['kaggle', 'datasets', 'create', '-p', str(target_dir), '-r', 'zip'])
+    p.communicate()
