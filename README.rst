@@ -218,7 +218,8 @@ Defect Pixel Thresholds
 I used 600, 600, 1000, 2000. If an image had fewer than this number of defect pixels for a class,
 all predictions for that class were set to zero.
 
-I tested some different values but it actually didn't have much impact.
+Small changes to these values had little effect on the predictions. I was reluctant to make large
+changes because of the risk I would overfit public LB.
 
 Component Domination
 ~~~~~~~~~~~~~~~~~~~~
@@ -233,8 +234,8 @@ pixel.
 
 Dilation
 ~~~~~~~~
-I tried varying amounts of dilation. Sometimes I got a small improvement, and sometimes got worse
-results so I stopped using it.
+I tried dilating the output prediction masks. Sometimes I got a small improvement, and sometimes
+got worse results so I stopped using it.
 
 Ensemble Averaging
 ~~~~~~~~~~~~~~~~~~
