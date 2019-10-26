@@ -336,24 +336,24 @@ Here's an example illustrating how the threshold is scaled with different factor
 .. image:: ./resources/classifier-threshold-scaling.png
 
 Here's a table comparing the results of my submissions with a classifier, to my previous ones. Note
-I ran it twice with ``c_scale = 5`` and changed some weights in my ensemble.
+I ran it twice with ``c_factor = 5`` and changed some weights in my ensemble.
 
 +---------------+-----------+------------+
 |     Config    | Public LB | Private LB |
 +===============+===========+============+
 | No classifier |  0.91817  |   0.90612  |
 +---------------+-----------+------------+
-|  c_scale = 5  |  0.91817  |   0.91023  |
+| c_factor = 5  |  0.91817  |   0.91023  |
 +---------------+-----------+------------+
-|  c_scale = 5  |  0.91832  |   0.90951  |
+| c_factor = 5  |  0.91832  |   0.90951  |
 +---------------+-----------+------------+
-|  c_scale = 10 |  0.91782  |   0.90952  |
+| c_factor = 10 |  0.91782  |   0.90952  |
 +---------------+-----------+------------+
-|  c_scale = 20 |  0.91763  |   0.90911  |
+| c_factor = 20 |  0.91763  |   0.90911  |
 +---------------+-----------+------------+
 
 From looking at my public LB score, I got zero and tiny improvements using a classifier and
-``c_scale=5``. When I tried increasing it, it looked like the results got much worse. Unknown to me,
+``c_factor=5``. When I tried increasing it, it looked like the results got much worse. Unknown to me,
 this was actually taking my private LB score from rank 11 to significantly better than rank 1! The
 first result, where my public LB score didn't increase at all, was actually the highest scoring
 submission I made all competition. As far as I know, no one on the discussion board has reported
