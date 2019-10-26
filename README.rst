@@ -349,6 +349,8 @@ ensemble would have performed with the help of a classifier.
 
 Final Ensemble
 ~~~~~~~~~~~~~~
+I used the following fully convolutional ensemble for my final submissions:
+
 - Unet
     - 2x se_resnext50_32x4d
     - 1x efficientnet-b5
@@ -356,6 +358,16 @@ Final Ensemble
     - 3x se_resnext50_32x4d
     - 1x efficientnet-b5
     - 1x inceptionv4
+
++---------------------+-----------+----------------+
+| Averaging Technique | Public LB |   Private LB   |
++=====================+===========+================+
+|        RMS          |  0.91844  |     0.90274    |
++---------------------+-----------+----------------+
+|       Mean^         |  0.91699  |   **0.90975**  |
++---------------------+-----------+----------------+
+
+^I re-ran my final submission with mean-averaging after the deadline to check its performance.
 
 Submission Scores
 ~~~~~~~~~~~~~~~~~
@@ -365,6 +377,14 @@ Visualisation of scores in the final week of the competition:
 
 The dip at the end is when I started using RMS averaging.
 
+Submission Kernels
+------------------
+Here are some public kernels showing the scores. There's a lot of copy-pasted code because of
+the kernel requirement of this competition - no easy way around it!
+
+1. `Private LB 0.91023 | Classification + Segmentation Ensemble  <https://www.kaggle.com/khornlund/sever-ensemble-classification?scriptVersionId=22207424>`_
+2. `Private LB 0.90975 | Fully Convolutional Segmentation Ensemble <https://www.kaggle.com/khornlund/fork-of-sever-ensemble-3?scriptVersionId=22527620>`_
+
 Discussion
 ----------
 
@@ -372,7 +392,7 @@ Improvements
 ~~~~~~~~~~~~
 Next time I would like to:
 
-- Use a background class
+- Softmax w/ background class
 - Lovasz Loss
 - Inplace BatchNorm (potentially huge memory saving)
 
@@ -436,6 +456,21 @@ Create and activate the ``Anaconda`` environment using:
 
   $ conda env create --file environment.yml
   $ conda activate sever
+
+Note that the models used here are in a mirror/fork of
+`SMP <https://github.com/khornlund/segmentation-models-pytorch>`_. If you want to use the same
+models, you'll need to clone this and install it into the ``conda`` environment using
+
+.. code-block:: bash
+
+  $ git clone git@github.com:khornlund/segmentation-models-pytorch.git
+  $ cd segmentation-models-pytorch/
+  $ git checkout efficietnet
+  $ pip install -e .
+
+Note there are some slight differences between my EfficientNet implementation, and the one that is
+now in SMP upstream. The key difference is I modified the encoders to support a configurable number
+of input channels, so I could use 1 channel grayscale input.
 
 Download
 --------
