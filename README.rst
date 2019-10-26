@@ -11,7 +11,7 @@ and maintain high quality in their production.*
 surface defects on a steel sheet.*
 
 .. contents::
-   :depth: 2
+   :depth: 3
 
 
 Competition Report
