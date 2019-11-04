@@ -32,7 +32,7 @@ data_loader:
     validation_split: 0.2
 
 loss:
-  type: SmoothBCEDiceLoss
+  type: BCEDiceLoss
   args:
     bce_weight: 0.6
     dice_weight: 0.4

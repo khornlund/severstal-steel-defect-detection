@@ -112,7 +112,7 @@ over the 2080Ti (11GB).
 
 Loss
 ~~~~
-I used ``(0.6 * BCE) + (0.4 * (1 - Dice))``. I applied smoothing (1e-6) to the labels.
+I used ``(0.6 * BCE) + (0.4 * (1 - Dice))``.
 
 Targets
 ~~~~~~~
@@ -428,11 +428,6 @@ Next time I would like to:
 - Inplace BatchNorm (potentially huge memory saving)
 
 And of course, *manually choose two submissions that are appropriately diverse*.
-
-Questions
-~~~~~~~~~
-From looking at other people's solutions, I haven't seen anyone else mention label smoothing. I
-found this gave a significant improvement - have others tried it?
 
 Usage
 =====
