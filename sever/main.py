@@ -76,6 +76,10 @@ class Runner:
         self.logger.debug('Finished!')
 
     def _setup_param_groups(self, model, config):
+        """
+        Originally this selectively applied weight decay to non-bias parameters,
+        but this hurt performance.
+        """
         encoder_opts = config['optimizer']['encoder']
         decoder_opts = config['optimizer']['decoder']
 

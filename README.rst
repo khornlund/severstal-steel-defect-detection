@@ -124,10 +124,10 @@ Optimizer
     - RAdam
     - Encoder
         - learning rate 7e-5
-        - weight decay: 3e-5 (not applied to bias)
+        - weight decay: 3e-5
     - Decoders
         - learning rate 3e-3
-        - weight decay: 3e-4 (not applied to bias)
+        - weight decay: 3e-4
 
 LR Schedule
 ~~~~~~~~~~~
