@@ -119,8 +119,9 @@ class SteelSegPseudoDataLoader(DataLoader):
     def load_df(self, train, validation_split):
         csv_filename = self.train_csv if train else self.pseudo_csv
         df = pd.read_csv(self.data_dir / csv_filename)
-        df['ImageId'], df['ClassId'] = zip(*df['ImageId_ClassId'].str.split('_'))
-        df['ClassId'] = df['ClassId'].astype(int)
+        if not train:  # the format of the csv has changed since the competition
+            df['ImageId'], df['ClassId'] = zip(*df['ImageId_ClassId'].str.split('_'))
+            df['ClassId'] = df['ClassId'].astype(int)
         df = df.pivot(index='ImageId', columns='ClassId', values='EncodedPixels')
         df.columns = [f'rle{c}' for c in range(4)]
         df['defects'] = df.count(axis=1)
