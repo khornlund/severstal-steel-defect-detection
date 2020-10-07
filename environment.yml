@@ -16,11 +16,11 @@ dependencies:
   - click
   - jupyter
   - pyyaml
-  - pytorch>=1.1.0
+  - pytorch=1.2.0
   - torchvision
   - cudatoolkit=10.0
-  - tensorflow
-  - tensorboard>=1.14
+  - tensorflow=1.3.0
+  - tensorboard=1.14.0
   - future
   - tqdm
   - kaggle
@@ -28,7 +28,7 @@ dependencies:
   - opencv
   - pip
   - pip:
-    - albumentations
+    - albumentations==0.3.3
     - efficientnet_pytorch
     # segmentation-models-pytorch
     - -e .
